@@ -9,11 +9,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { nozzles } from "@/features/nozzles/data";
+import type { Nozzle } from "@/features/data";
 
 const ranges = ["Past 7 days", "Past 30 days", "Past 1 year", "Custom range"];
 
-export default function NozzleReportsPage() {
+export default function NozzleReportsPage({ nozzles }: { nozzles: Nozzle[] }) {
   const [query, setQuery] = useState("");
   const [range, setRange] = useState("Past 7 days");
   const filtered = useMemo(
@@ -23,7 +23,7 @@ export default function NozzleReportsPage() {
           .toLowerCase()
           .includes(query.toLowerCase()),
       ),
-    [query],
+    [query, nozzles],
   );
 
   return (

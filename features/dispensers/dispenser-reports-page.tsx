@@ -10,11 +10,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { transactions } from "@/features/dispensers/data";
+import type { Transaction } from "@/features/data";
 
 const ranges = ["Past 7 days", "Past 30 days", "Past 1 year", "Custom range"];
 
-export default function DispenserReportsPage() {
+export default function DispenserReportsPage({ transactions }: { transactions: Transaction[] }) {
   const [query, setQuery] = useState("");
   const [range, setRange] = useState("Past 7 days");
   const filtered = useMemo(
@@ -24,7 +24,7 @@ export default function DispenserReportsPage() {
           transaction.dispenser.toLowerCase().includes(query.toLowerCase()) ||
           transaction.id.toLowerCase().includes(query.toLowerCase()),
       ),
-    [query],
+    [query, transactions],
   );
 
   return (

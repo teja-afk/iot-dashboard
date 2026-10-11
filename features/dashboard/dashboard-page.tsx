@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import {
   Activity,
   ArrowUpRight,
@@ -65,12 +66,12 @@ export default function DashboardPage() {
                   Transactions processed today
                 </p>
               </div>
-              <a
+              <Link
                 className="inline-flex items-center gap-1 text-xs font-semibold text-[#16806c]"
                 href="/dispensers/reports"
               >
                 View reports <ArrowUpRight className="size-3.5" />
-              </a>
+              </Link>
             </div>
             <div className="mt-8 flex h-48 items-end gap-2 sm:gap-4">
               {[42, 58, 46, 72, 64, 84, 68, 91, 76, 88, 80, 96].map(
@@ -100,12 +101,12 @@ export default function DashboardPage() {
               Nozzle N-104 has exceeded its calibration window. Nozzle N-208
               reported a low-flow event.
             </p>
-            <a
+            <Link
               className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-[#8dd9c7]"
               href="/nozzles"
             >
               Review nozzles <ArrowUpRight className="size-4" />
-            </a>
+            </Link>
           </div>
         </section>
       </div>

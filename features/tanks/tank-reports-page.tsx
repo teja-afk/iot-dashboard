@@ -9,11 +9,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { tanks } from "@/features/tanks/data";
+import type { Tank } from "@/features/data";
 
 const ranges = ["Past 7 days", "Past 30 days", "Past 1 year", "Custom range"];
 
-export default function TankReportsPage() {
+export default function TankReportsPage({ tanks }: { tanks: Tank[] }) {
   const [query, setQuery] = useState("");
   const [range, setRange] = useState("Past 7 days");
   const filtered = useMemo(
@@ -23,7 +23,7 @@ export default function TankReportsPage() {
           .toLowerCase()
           .includes(query.toLowerCase()),
       ),
-    [query],
+    [query, tanks],
   );
 
   return (
