@@ -1,30 +1,44 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  CalendarDays,
-  Download,
-  Search,
-  SlidersHorizontal,
-} from "lucide-react";
+import { useState } from "react";
+import { CalendarDays, Download, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table-bulk-actions";
 import type { Tank } from "@/features/data";
 
 const ranges = ["Past 7 days", "Past 30 days", "Past 1 year", "Custom range"];
 
 export default function TankReportsPage({ tanks }: { tanks: Tank[] }) {
-  const [query, setQuery] = useState("");
   const [range, setRange] = useState("Past 7 days");
-  const filtered = useMemo(
-    () =>
-      tanks.filter((tank) =>
-        `${tank.id} ${tank.name} ${tank.product}`
-          .toLowerCase()
-          .includes(query.toLowerCase()),
+
+  const columns: ColumnDef<Tank, any>[] = [
+    {
+      id: "tank",
+      header: "Tank",
+      accessorFn: (row) => `${row.name} ${row.id}`,
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium text-[#17352f]">{row.original.name}</p>
+          <p className="font-mono text-xs text-slate-400">{row.original.id}</p>
+        </div>
       ),
-    [query, tanks],
-  );
+    },
+    { accessorKey: "product", header: "Product", cell: ({ getValue }) => <span className="text-slate-600">{getValue<string>()}</span> },
+    {
+      id: "level",
+      header: "Level",
+      accessorFn: (row) => `${row.level} (${row.levelPercent}%)`,
+      cell: ({ row }) => (
+        <span className="font-medium text-[#17352f]">
+          {row.original.level} <span className="text-xs font-normal text-slate-400">({row.original.levelPercent}%)</span>
+        </span>
+      ),
+    },
+    { accessorKey: "capacity", header: "Capacity", cell: ({ getValue }) => <span className="text-slate-600">{getValue<string>()}</span> },
+    { accessorKey: "temperature", header: "Temperature", cell: ({ getValue }) => <span className="text-slate-600">{getValue<string>()}</span> },
+    { accessorKey: "lastDelivery", header: "Last Delivery", cell: ({ getValue }) => <span className="whitespace-nowrap font-mono text-xs font-medium tabular-nums text-[#17352f]">{getValue<string>()}</span> },
+  ];
 
   return (
     <ReportLayout
@@ -33,35 +47,24 @@ export default function TankReportsPage({ tanks }: { tanks: Tank[] }) {
       description="Review historical tank levels, temperatures, and fuel deliveries."
     >
       <div className="rounded-2xl border border-[#dce9e5] bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Enter tank ID or product"
-              className="h-10 pl-9"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ranges.map((option) => (
-              <Button
-                key={option}
-                variant={range === option ? "secondary" : "outline"}
-                onClick={() => setRange(option)}
-                className="h-10"
-              >
-                {option === "Custom range" && <CalendarDays />}
-                {option}
-              </Button>
-            ))}
-            <Button variant="outline" size="icon" className="h-10 w-10">
-              <SlidersHorizontal />
+        <div className="flex flex-wrap gap-2">
+          {ranges.map((option) => (
+            <Button
+              key={option}
+              variant={range === option ? "secondary" : "outline"}
+              onClick={() => setRange(option)}
+              className="h-10"
+            >
+              {option === "Custom range" && <CalendarDays />}
+              {option}
             </Button>
-            <Button className="h-10">
-              <Download /> Export
-            </Button>
-          </div>
+          ))}
+          <Button variant="outline" size="icon" className="h-10 w-10">
+            <SlidersHorizontal />
+          </Button>
+          <Button className="h-10">
+            <Download /> Export
+          </Button>
         </div>
         {range === "Custom range" && (
           <div className="mt-3 grid max-w-md grid-cols-2 gap-3">
@@ -77,52 +80,22 @@ export default function TankReportsPage({ tanks }: { tanks: Tank[] }) {
         )}
       </div>
 
-      <div className="rounded-2xl border border-[#dce9e5] bg-white shadow-sm">
-        <div className="border-b border-[#e7efec] px-5 py-4">
-          <h2 className="font-semibold text-[#17352f]">Tank readings</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            {filtered.length} records matching {query || "all tanks"} · {range}
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-170 text-left text-sm">
-            <thead className="bg-[#f8fbfa] text-xs uppercase tracking-wider text-slate-400">
-              <tr>
-                <th className="px-5 py-3 font-medium">Tank</th>
-                <th className="px-5 py-3 font-medium">Product</th>
-                <th className="px-5 py-3 font-medium">Level</th>
-                <th className="px-5 py-3 font-medium">Capacity</th>
-                <th className="px-5 py-3 font-medium">Temperature</th>
-                <th className="px-5 py-3 font-medium">Last Delivery</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#edf3f0]">
-              {filtered.map((tank) => (
-                <tr key={tank.id} className="hover:bg-[#fbfdfc]">
-                  <td className="px-5 py-4">
-                    <p className="font-medium text-[#17352f]">{tank.name}</p>
-                    <p className="font-mono text-xs text-slate-400">{tank.id}</p>
-                  </td>
-                  <td className="px-5 py-4 text-slate-600">{tank.product}</td>
-                  <td className="px-5 py-4 font-medium text-[#17352f]">
-                    {tank.level}{" "}
-                    <span className="text-xs font-normal text-slate-400">
-                      ({tank.levelPercent}%)
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-slate-600">{tank.capacity}</td>
-                  <td className="px-5 py-4 text-slate-600">
-                    {tank.temperature}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-4 font-mono text-xs font-medium tabular-nums text-[#17352f]">
-                    {tank.lastDelivery}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        label="Tank readings"
+        data={tanks}
+        columns={columns}
+        searchPlaceholder="Search tanks"
+        selectable
+        columnToggle
+        pageSize={8}
+        fillHeight
+        bulkActions={(rows) => (
+          <Button variant="outline" size="sm">
+            <Download /> Export {rows.length}
+          </Button>
+        )}
+        className="rounded-2xl border border-[#dce9e5] bg-white p-3 shadow-sm"
+      />
     </ReportLayout>
   );
 }
@@ -139,8 +112,8 @@ function ReportLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-[calc(100vh-2.75rem)] bg-[#f6f8f7] p-5 sm:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-[calc(100svh-3rem)] bg-[#f6f8f7] p-5 sm:p-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#16806c]">
             {eyebrow}

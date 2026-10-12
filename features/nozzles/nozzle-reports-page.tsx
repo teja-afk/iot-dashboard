@@ -1,34 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  CalendarDays,
-  Download,
-  Search,
-  SlidersHorizontal,
-} from "lucide-react";
+import { useState } from "react";
+import { CalendarDays, Download, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table-bulk-actions";
 import type { Nozzle } from "@/features/data";
 
 const ranges = ["Past 7 days", "Past 30 days", "Past 1 year", "Custom range"];
 
 export default function NozzleReportsPage({ nozzles }: { nozzles: Nozzle[] }) {
-  const [query, setQuery] = useState("");
   const [range, setRange] = useState("Past 7 days");
-  const filtered = useMemo(
-    () =>
-      nozzles.filter((nozzle) =>
-        `${nozzle.id} ${nozzle.dispenser} ${nozzle.product}`
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-      ),
-    [query, nozzles],
-  );
+
+  const columns: ColumnDef<Nozzle, any>[] = [
+    { accessorKey: "id", header: "Nozzle", cell: ({ getValue }) => <span className="font-medium text-[#17352f]">{getValue<string>()}</span> },
+    { accessorKey: "dispenser", header: "Dispenser", cell: ({ getValue }) => <span className="text-slate-600">{getValue<string>()}</span> },
+    { accessorKey: "product", header: "Product", cell: ({ getValue }) => <span className="text-slate-600">{getValue<string>()}</span> },
+    { accessorKey: "totalVolume", header: "Volume", meta: { align: "right" }, cell: ({ getValue }) => <span className="text-slate-600">{getValue<string>()}</span> },
+    { accessorKey: "transactions", header: "Transactions", meta: { align: "right" }, cell: ({ getValue }) => <span className="text-slate-600">{getValue<number>()}</span> },
+    { accessorKey: "lastCalibration", header: "Calibration", cell: ({ getValue }) => <span className="text-xs text-slate-500">{getValue<string>()}</span> },
+  ];
 
   return (
-    <div className="min-h-[calc(100vh-2.75rem)] bg-[#f6f8f7] p-5 sm:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-[calc(100svh-3rem)] bg-[#f6f8f7] p-5 sm:p-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#16806c]">
             Nozzle / Reports
@@ -42,35 +37,24 @@ export default function NozzleReportsPage({ nozzles }: { nozzles: Nozzle[] }) {
         </div>
 
         <div className="rounded-2xl border border-[#dce9e5] bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Enter nozzle ID, dispenser serial, or product"
-                className="h-10 pl-9"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {ranges.map((option) => (
-                <Button
-                  key={option}
-                  variant={range === option ? "secondary" : "outline"}
-                  onClick={() => setRange(option)}
-                  className="h-10"
-                >
-                  {option === "Custom range" && <CalendarDays />}
-                  {option}
-                </Button>
-              ))}
-              <Button variant="outline" size="icon" className="h-10 w-10">
-                <SlidersHorizontal />
+          <div className="flex flex-wrap gap-2">
+            {ranges.map((option) => (
+              <Button
+                key={option}
+                variant={range === option ? "secondary" : "outline"}
+                onClick={() => setRange(option)}
+                className="h-10"
+              >
+                {option === "Custom range" && <CalendarDays />}
+                {option}
               </Button>
-              <Button className="h-10">
-                <Download /> Export
-              </Button>
-            </div>
+            ))}
+            <Button variant="outline" size="icon" className="h-10 w-10">
+              <SlidersHorizontal />
+            </Button>
+            <Button className="h-10">
+              <Download /> Export
+            </Button>
           </div>
           {range === "Custom range" && (
             <div className="mt-3 grid max-w-md grid-cols-2 gap-3">
@@ -86,52 +70,22 @@ export default function NozzleReportsPage({ nozzles }: { nozzles: Nozzle[] }) {
           )}
         </div>
 
-        <div className="rounded-2xl border border-[#dce9e5] bg-white shadow-sm">
-          <div className="border-b border-[#e7efec] px-5 py-4">
-            <h2 className="font-semibold text-[#17352f]">Nozzle readings</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              {filtered.length} records matching {query || "all nozzles"} · {range}
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-180 text-left text-sm">
-              <thead className="bg-[#f8fbfa] text-xs uppercase tracking-wider text-slate-400">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Nozzle</th>
-                  <th className="px-5 py-3 font-medium">Dispenser</th>
-                  <th className="px-5 py-3 font-medium">Product</th>
-                  <th className="px-5 py-3 font-medium">Volume</th>
-                  <th className="px-5 py-3 font-medium">Transactions</th>
-                  <th className="px-5 py-3 font-medium">Calibration</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#edf3f0]">
-                {filtered.map((nozzle) => (
-                  <tr key={nozzle.id} className="hover:bg-[#fbfdfc]">
-                    <td className="px-5 py-4 font-medium text-[#17352f]">
-                      {nozzle.id}
-                    </td>
-                    <td className="px-5 py-4 text-slate-600">
-                      {nozzle.dispenser}
-                    </td>
-                    <td className="px-5 py-4 text-slate-600">
-                      {nozzle.product}
-                    </td>
-                    <td className="px-5 py-4 text-slate-600">
-                      {nozzle.totalVolume}
-                    </td>
-                    <td className="px-5 py-4 text-slate-600">
-                      {nozzle.transactions}
-                    </td>
-                    <td className="px-5 py-4 text-xs text-slate-500">
-                      {nozzle.lastCalibration}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          label="Nozzle readings"
+          data={nozzles}
+          columns={columns}
+          searchPlaceholder="Search nozzles"
+          selectable
+          columnToggle
+          pageSize={8}
+          fillHeight
+          bulkActions={(rows) => (
+            <Button variant="outline" size="sm">
+              <Download /> Export {rows.length}
+            </Button>
+          )}
+          className="rounded-2xl border border-[#dce9e5] bg-white p-3 shadow-sm"
+        />
       </div>
     </div>
   );

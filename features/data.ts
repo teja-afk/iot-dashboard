@@ -10,6 +10,8 @@ export type Tank = {
   name: string;
   product: string;
   capacity: string;
+  fuelLevel?: string;
+  waterLevel?: number;
   level: string;
   levelPercent: number;
   waterPercent: number | null;
@@ -100,23 +102,23 @@ export const tanks: Tank[] = [
     status: "Healthy",
     temperature: "22.4 C",
     lastDelivery: "25-09-2026 18:20:00",
-    manufacturer: "Franklin Fueling Systems",
-    model: "TSP-40000-DW",
-    serial: "FFS-TK-001-8842",
+    manufacturer: "Veeder-Root",
+    model: "TLS-450PLUS",
+    serial: "VR-TK-001-2915",
     location: "North forecourt · Bay A",
-    installedAt: "14 Mar 2022",
-    firmware: "v3.8.2",
-    lastInspection: "18 Sep 2026",
-    maintenanceDue: "18 Dec 2026",
+    installedAt: "03 Jan 2022",
+    firmware: "v4.2.1",
+    lastInspection: "15 Sep 2026",
+    maintenanceDue: "15 Oct 2026",
     sensors: [
-      { name: "Level probe", status: "Online", reading: "2.84 m" },
-      { name: "Water detector", status: "Online", reading: "3%" },
+      { name: "Level probe", status: "Online", reading: "2.86 m" },
+      { name: "Water detector", status: "Warning", reading: "3%" },
       { name: "Temperature probe", status: "Online", reading: "22.4 °C" },
     ],
     events: [
-      { id: "TK1-E1", title: "Delivery completed", description: "8,500 L received · delivery reconciled", time: "25 Sep 2026, 18:20", kind: "info" },
-      { id: "TK1-E2", title: "Probe health check", description: "All tank sensors are reporting normally", time: "25 Sep 2026, 12:00", kind: "info" },
-      { id: "TK1-E3", title: "Routine inspection", description: "Next inspection window is due in December", time: "18 Sep 2026, 09:30", kind: "service" },
+      { id: "TK1-E1", title: "Inventory check", description: "Tank remains within target range", time: "26 Sep 2026, 08:10", kind: "info" },
+      { id: "TK1-E2", title: "Water detected", description: "Water draw recommended at next service window", time: "25 Sep 2026, 18:00", kind: "warning" },
+      { id: "TK1-E3", title: "Routine inspection", description: "No critical faults reported", time: "15 Sep 2026, 09:45", kind: "service" },
     ],
   },
   {

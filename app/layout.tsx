@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   description: "Operations dashboard for fuel station equipment and activity.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="en"
