@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment, useEffect, useState } from "react";
-import { Clock3 } from "lucide-react";
+import { Fragment } from "react";
+import { Clock } from "@/components/ui/clock";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -48,28 +48,9 @@ function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
   return entries;
 }
 
-function getClockTime(date: Date) {
-  return new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  })
-    .format(date)
-    .replaceAll(":", "-");
-}
-
 export function DashboardHeader() {
   const pathname = usePathname();
-  const [time, setTime] = useState<string | null>(null);
   const breadcrumbs = getBreadcrumbs(pathname);
-
-  useEffect(() => {
-    const updateClock = () => setTime(getClockTime(new Date()));
-    updateClock();
-    const intervalId = window.setInterval(updateClock, 1000);
-    return () => window.clearInterval(intervalId);
-  }, []);
 
   return (
     <header className="flex min-h-12 items-center justify-between gap-4 border-b border-[#dce9e5] bg-white/90 px-4 py-2 sm:px-6">
@@ -94,9 +75,8 @@ export function DashboardHeader() {
         </Breadcrumb>
       </div>
 
-      <div className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-[#cde4dd] bg-[#f6fbf9] px-3 py-1.5 font-mono text-sm font-semibold tabular-nums text-[#16806c]" aria-label={time ? `Local time ${time.replaceAll("-", ":")}` : "Local clock loading"}>
-        <Clock3 aria-hidden="true" className="size-4" />
-        <time suppressHydrationWarning>{time ?? "--:--:--"}</time>
+      <div className="inline-flex shrink-0 items-center font-mono text-sm font-semibold tabular-nums text-black">
+        <Clock />
       </div>
     </header>
   );
