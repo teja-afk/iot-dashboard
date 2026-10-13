@@ -1,5 +1,6 @@
 import { EquipmentOverview, type OverviewItem } from "@/components/equipment/equipment-overview";
 import { listTanks } from "@/features/tanks/repository";
+import { TankLevelGraphic } from "@/features/tanks/components/tank-level-graphic";
 
 export default async function TankPage() {
   const tanks = await listTanks();
@@ -11,8 +12,15 @@ export default async function TankPage() {
     status: tank.status,
     statusTone: tank.status === "Healthy" ? "good" : tank.status === "Low level" ? "warning" : "critical",
     icon: "tank",
-    progress: tank.levelPercent,
-    progressLabel: tank.product === "CNG" ? "Available gas" : "Fuel level",
+    visual: (
+      <TankLevelGraphic
+        id={tank.id}
+        product={tank.product}
+        levelPercent={tank.levelPercent}
+        waterPercent={tank.waterPercent}
+        size="compact"
+      />
+    ),
     metrics: [
       { label: "Volume", value: tank.level },
       { label: "Capacity", value: tank.capacity },

@@ -26,7 +26,7 @@ const tones = {
 export function DetailHeader({
   backHref,
   backLabel,
-  eyebrow,
+  // eyebrow,
   parentHref,
   parentLabel,
   title,
@@ -57,7 +57,7 @@ export function DetailHeader({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#16806c]">
             {parentHref && parentLabel && <><Link href={parentHref} className="hover:underline">{parentLabel}</Link><span className="px-1">/</span></>}
-            {eyebrow}
+            {/* {eyebrow} */}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-semibold tracking-tight text-[#17352f]">{title}</h1>

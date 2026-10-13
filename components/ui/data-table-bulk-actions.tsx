@@ -220,7 +220,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
         }
       }}
       className={cn(
-        "flex w-full min-w-0 cursor-text items-center gap-2 bg-card text-foreground ring-1 ring-inset ring-input transition-[box-shadow]",
+        "flex w-full min-w-0 cursor-text items-center gap-2 bg-card text-foreground ring-1 ring-inset ring-input transition-shadow",
         "hover:ring-foreground/25 has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring",
         "has-[input[aria-invalid=true]]:ring-destructive/60 has-[input:disabled]:cursor-not-allowed has-[input:disabled]:opacity-50",
         "[&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
@@ -656,7 +656,7 @@ export const DropdownMenuItem = React.forwardRef<React.ElementRef<typeof MenuPri
         className={cn(
           ITEM,
           inset && "pl-8",
-          danger && "text-red-700 dark:text-red-400 data-[highlighted]:bg-destructive/10 [&_svg]:text-red-700 [&_svg]:dark:text-red-400",
+          danger && "text-red-700 dark:text-red-400 data-highlighted:bg-destructive/10 [&_svg]:text-red-700 [&_svg]:dark:text-red-400",
           className,
         )}
         {...props}

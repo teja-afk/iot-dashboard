@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Cable, Database, FileChartColumn, Fuel, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ export type OverviewItem = {
   metrics: { label: string; value: string }[];
   progress?: number;
   progressLabel?: string;
+  visual?: ReactNode;
 };
 
 const statusStyles: Record<OverviewItem["statusTone"], string> = {
@@ -106,7 +108,9 @@ export function EquipmentOverview({
                     <p className="col-span-2 text-sm text-slate-500">{item.subtitle}</p>
                   </CardHeader>
                   <CardContent>
-                    {item.progress !== undefined && (
+                    {item.visual ? (
+                      <div className="mb-4">{item.visual}</div>
+                    ) : item.progress !== undefined ? (
                       <div className="mb-4">
                         <div className="mb-2 flex justify-between text-xs text-slate-500">
                           <span>{item.progressLabel ?? "Capacity"}</span><span className="font-semibold text-[#17352f]">{item.progress}%</span>
@@ -115,7 +119,7 @@ export function EquipmentOverview({
                           <div className="h-full rounded-full bg-[#16806c]" style={{ width: `${item.progress}%` }} />
                         </div>
                       </div>
-                    )}
+                    ) : null}
                     <dl className="grid grid-cols-2 gap-x-3 gap-y-4">
                       {item.metrics.map((metric) => (
                         <div key={metric.label} className="min-w-0">

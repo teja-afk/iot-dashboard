@@ -19,10 +19,7 @@ export default async function DashboardPage() {
       <div className="mx-auto max-w-7xl space-y-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#16806c]">
-              Station control
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#17352f]">
+            <h1 className="text-3xl font-semibold tracking-tight text-[#17352f]">
               {stationName}
             </h1>
             <p className="mt-2 text-sm text-slate-500">

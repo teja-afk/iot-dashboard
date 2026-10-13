@@ -9,6 +9,7 @@ import {
   PropertyGrid,
   type ChildAsset,
 } from "@/components/equipment/equipment-detail";
+import { TankLevelGraphic } from "@/features/tanks/components/tank-level-graphic";
 import type { Dispenser, Tank } from "@/features/data";
 
 export default function TankDetailPage({ tank, dispensers }: { tank: Tank; dispensers: Dispenser[] }) {
@@ -32,7 +33,7 @@ export default function TankDetailPage({ tank, dispensers }: { tank: Tank; dispe
         <DetailHeader
           backHref="/tanks"
           backLabel="tanks"
-          eyebrow={`Tank / ${tank.product}`}
+          // eyebrow={`Tank / ${tank.product}`}
           title={tank.name}
           id={tank.id}
           description={`${tank.product} storage · ${tank.level} of ${tank.capacity} · last delivery ${tank.lastDelivery}`}
@@ -51,10 +52,13 @@ export default function TankDetailPage({ tank, dispensers }: { tank: Tank; dispe
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-6">
             <DetailSection title="Tank telemetry" description="Current levels and connected sensor health.">
-              <div className="grid gap-6 md:grid-cols-[180px_minmax(0,1fr)] md:items-center">
-                <div className="mx-auto flex h-48 w-32 items-end overflow-hidden rounded-[3rem] border-[5px] border-slate-200 bg-slate-50 p-1.5 shadow-inner" role="img" aria-label={`${tank.levelPercent}% tank capacity`}>
-                  <div className="w-full rounded-[2.5rem] bg-linear-to-t from-emerald-700 to-emerald-400 transition-all" style={{ height: `${tank.levelPercent}%` }} />
-                </div>
+              <div className="grid gap-6 md:grid-cols-[minmax(220px,0.7fr)_minmax(0,1.3fr)] md:items-center">
+                <TankLevelGraphic
+                  id={tank.id}
+                  product={tank.product}
+                  levelPercent={tank.levelPercent}
+                  waterPercent={tank.waterPercent}
+                />
                 <div className="space-y-5">
                   <div>
                     <div className="mb-2 flex justify-between text-sm"><span className="text-slate-500">Available volume</span><span className="font-semibold text-[#17352f]">{tank.levelPercent}%</span></div>
