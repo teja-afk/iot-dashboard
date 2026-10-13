@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -8,8 +9,17 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { getStationOverview } from "@/features/dashboard/repository";
+import { DashboardLoading } from "@/features/dashboard/dashboard-loading";
 
-export default async function DashboardPage() {
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <StationOverviewContent />
+    </Suspense>
+  );
+}
+
+async function StationOverviewContent() {
   const overview = await getStationOverview();
   const stationName = overview.station?.name ?? overview.station?.id ?? "Station Overview";
   const maxActivity = Math.max(1, ...overview.activity.map((bucket) => bucket.count));
