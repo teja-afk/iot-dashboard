@@ -37,12 +37,14 @@ export function EquipmentOverview({
   searchPlaceholder,
   items,
   reportsHref,
+  statusSummaryLabel = "healthy",
 }: {
   title: string;
   description: string;
   searchPlaceholder: string;
   items: OverviewItem[];
   reportsHref: string;
+  statusSummaryLabel?: string;
 }) {
   const [query, setQuery] = useState("");
   const visibleItems = useMemo(() => {
@@ -71,7 +73,7 @@ export function EquipmentOverview({
             </Link>
             <Badge className="border-[#cde4dd] bg-white px-3 py-2 text-[#16806c]">
               <span className="size-2 rounded-full bg-emerald-500" />
-              {items.length} assets · {items.filter((item) => item.statusTone === "good").length} healthy
+              {items.length} assets · {items.filter((item) => item.statusTone === "good").length} {statusSummaryLabel}
             </Badge>
           </div>
         </header>

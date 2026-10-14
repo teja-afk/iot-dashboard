@@ -6,36 +6,36 @@ export default async function TankPage() {
   const tanks = await listTanks();
   const items: OverviewItem[] = tanks.map((tank) => ({
     id: tank.id,
-    name: tank.name,
-    subtitle: `${tank.product} · ${tank.location ?? "Location not provided"}`,
+    name: tank.serialNumber === "—" ? `Tank ${tank.id}` : tank.serialNumber,
+    subtitle: `Retail outlet ${tank.retailOutletId} · ${tank.height ?? "—"} × ${tank.width ?? "—"} mm`,
     href: `/tanks/${encodeURIComponent(tank.id)}`,
-    status: tank.status,
-    statusTone: tank.status === "Healthy" ? "good" : tank.status === "Low level" ? "warning" : "critical",
+    status: tank.probeStatus,
+    statusTone: tank.probeStatus.toLowerCase() === "active" ? "good" : "warning",
     icon: "tank",
     visual: (
       <TankLevelGraphic
         id={tank.id}
-        product={tank.product}
-        levelPercent={tank.levelPercent}
-        waterPercent={tank.waterPercent}
+        fuelLevelLiters={tank.latestReading?.fuelLevelLiters ?? null}
+        waterLevelLiters={tank.latestReading?.waterLevelLiters ?? null}
         size="compact"
       />
     ),
     metrics: [
-      { label: "Volume", value: tank.level },
-      { label: "Capacity", value: tank.capacity },
-      { label: "Temperature", value: tank.temperature ?? "—" },
-      { label: "Last delivery", value: tank.lastDelivery ?? "—" },
+      { label: "Fuel", value: tank.latestReading?.fuelLevelLiters == null ? "—" : `${tank.latestReading.fuelLevelLiters.toLocaleString()} L` },
+      { label: "Water", value: tank.latestReading?.waterLevelLiters == null ? "—" : `${tank.latestReading.waterLevelLiters.toLocaleString()} L` },
+      { label: "Temperature", value: tank.latestReading?.temperature == null ? "—" : `${tank.latestReading.temperature}°` },
+      { label: "Last reading", value: tank.latestReading?.datetime ?? "No telemetry" },
     ],
   }));
 
   return (
     <EquipmentOverview
       title="Tank overview"
-      description="A quick operational glance across every tank. Open a tank for sensor, maintenance, and connected dispenser details."
-      searchPlaceholder="Search tank ID, product, or location"
+      description="Current tank inventory, probe status, and latest reported fuel, water, temperature, and ullage readings."
+      searchPlaceholder="Search tank ID, serial, probe status, or reading"
       items={items}
       reportsHref="/tanks/reports"
+      statusSummaryLabel="probes active"
     />
   );
 }

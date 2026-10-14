@@ -1,102 +1,41 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarDays, Download, SlidersHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DataTable, type ColumnDef } from "@/components/ui/data-table-bulk-actions";
-import type { Transaction } from "@/features/data";
+import type { DispenserTransaction } from "@/features/equipment/model";
 
-const ranges = ["Past 7 days", "Past 30 days", "Past 1 year", "Custom range"];
-
-export default function DispenserReportsPage({ transactions }: { transactions: Transaction[] }) {
-  const [range, setRange] = useState("Past 7 days");
-
-  const columns: ColumnDef<Transaction, any>[] = [
-    { accessorKey: "id", header: "Transaction", meta: { label: "Transaction" }, cell: ({ getValue }) => <span className="font-medium text-[#17352f]">{getValue<string>()}</span> },
-    { accessorKey: "dispenser", header: "Dispenser", cell: ({ getValue }) => <span className="text-slate-600">{getValue<string>()}</span> },
-    {
-      id: "product",
-      header: "Nozzle / Product",
-      accessorFn: (row) => `${row.nozzle} ${row.product}`,
-      cell: ({ row }) => (
-        <div>
-          <span className="text-slate-700">{row.original.nozzle}</span>
-          <span className="ml-2 text-xs text-slate-400">{row.original.product}</span>
-        </div>
-      ),
-    },
-    { accessorKey: "volume", header: "Volume", meta: { align: "right" }, cell: ({ getValue }) => <span className="text-slate-600">{getValue<string>()}</span> },
-    { accessorKey: "amount", header: "Amount", meta: { align: "right" }, cell: ({ getValue }) => <span className="font-medium text-[#17352f]">{getValue<string>()}</span> },
-    { accessorKey: "timestamp", header: "Time", cell: ({ getValue }) => <span className="text-xs text-slate-500">{getValue<string>()}</span> },
+export default function DispenserReportsPage({ transactions }: { transactions: DispenserTransaction[] }) {
+  const columns: ColumnDef<DispenserTransaction, unknown>[] = [
+    { accessorKey: "datetime", header: "Date / time", cell: ({ getValue }) => <span className="whitespace-nowrap text-xs text-slate-500">{getValue<string>()}</span> },
+    { accessorKey: "dispenserSerial", header: "Dispenser", cell: ({ getValue }) => <span className="font-medium text-[#17352f]">{getValue<string>()}</span> },
+    { accessorKey: "nozzleNumber", header: "Nozzle", cell: ({ getValue }) => <span>{getValue<string>()}</span> },
+    { accessorKey: "volume", header: "Volume", meta: { align: "right" }, cell: ({ getValue }) => <span>{getValue<number | null>()?.toLocaleString() ?? "—"} L</span> },
+    { accessorKey: "amount", header: "Amount", meta: { align: "right" }, cell: ({ getValue }) => <span>{getValue<number | null>()?.toLocaleString() ?? "—"}</span> },
+    { accessorKey: "unitPrice", header: "Unit price", meta: { align: "right" }, cell: ({ getValue }) => <span>{getValue<number | null>()?.toLocaleString() ?? "—"}</span> },
+    { accessorKey: "receiptNumber", header: "Receipt" },
+    { accessorKey: "volumeTotalizer", header: "Volume totalizer", meta: { align: "right" } },
   ];
 
   return (
-    <div className="min-h-[calc(100svh-3rem)] bg-[#f6f8f7] p-5 sm:p-8">
+    <main className="min-h-[calc(100svh-3rem)] bg-[#f6f8f7] p-5 sm:p-8">
       <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#16806c]">
-            Dispenser / Reports
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#17352f]">
-            Transaction history
-          </h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Search historical dispenser activity by serial number or transaction ID.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-[#dce9e5] bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap gap-2">
-            {ranges.map((option) => (
-              <Button
-                key={option}
-                variant={range === option ? "secondary" : "outline"}
-                onClick={() => setRange(option)}
-                className="h-10"
-              >
-                {option === "Custom range" && <CalendarDays />}
-                {option}
-              </Button>
-            ))}
-            <Button variant="outline" size="icon" className="h-10 w-10" title="More filters">
-              <SlidersHorizontal />
-            </Button>
-            <Button className="h-10">
-              <Download /> Export
-            </Button>
-          </div>
-          {range === "Custom range" && (
-            <div className="mt-3 grid max-w-md grid-cols-2 gap-3">
-              <label className="text-xs font-medium text-slate-500">
-                From
-                <Input type="date" className="mt-1 h-9" />
-              </label>
-              <label className="text-xs font-medium text-slate-500">
-                To
-                <Input type="date" className="mt-1 h-9" />
-              </label>
-            </div>
-          )}
-        </div>
-
+        <header>
+          <h1 className="text-3xl font-semibold tracking-tight text-[#17352f]">Dispenser telemetry</h1>
+          <p className="mt-2 text-sm text-slate-500">Transaction-like records from dispensers_telemetry for the configured retail outlet.</p>
+        </header>
         <DataTable
-          label="Transactions"
+          label="Dispenser telemetry"
           data={transactions}
           columns={columns}
-          searchPlaceholder="Search transactions"
+          getRowId={(transaction) => transaction.id}
+          searchPlaceholder="Search serial, nozzle, receipt, or time"
           selectable
           columnToggle
-          pageSize={8}
+          pageSize={10}
           fillHeight
-          bulkActions={(rows) => (
-            <Button variant="outline" size="sm">
-              <Download /> Export {rows.length}
-            </Button>
-          )}
+          empty={<p className="p-8 text-center text-sm text-slate-500">No dispenser telemetry records found for this outlet.</p>}
           className="rounded-2xl border border-[#dce9e5] bg-white p-3 shadow-sm"
         />
       </div>
-    </div>
+    </main>
   );
 }

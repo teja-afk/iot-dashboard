@@ -21,7 +21,6 @@ export default function DashboardPage() {
 
 async function StationOverviewContent() {
   const overview = await getStationOverview();
-  const stationName = overview.station?.name ?? overview.station?.id ?? "Station Overview";
   const maxActivity = Math.max(1, ...overview.activity.map((bucket) => bucket.count));
 
   return (
@@ -30,10 +29,10 @@ async function StationOverviewContent() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-[#17352f]">
-              {stationName}
+              Retail outlet {overview.retailOutletId}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Current status from your station equipment and transactions.
+              Current equipment and transaction data from MongoDB.
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-[#cde4dd] bg-white px-3 py-2 text-xs font-medium shadow-sm">
@@ -47,15 +46,15 @@ async function StationOverviewContent() {
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <OverviewCard
             icon={<RadioTower />}
-            label="Connected dispensers"
-            value={`${overview.dispensers.connected} / ${overview.dispensers.total}`}
-            detail={overview.dispensers.total === overview.dispensers.connected ? "All dispensers online" : `${overview.dispensers.total - overview.dispensers.connected} offline or in maintenance`}
+            label="Registered dispensers"
+            value={overview.dispensers.registered.toLocaleString()}
+            detail="From dispenser inventory"
           />
           <OverviewCard
             icon={<Gauge />}
-            label="Active nozzles"
-            value={`${overview.nozzles.active} / ${overview.nozzles.total}`}
-            detail={`Across ${overview.nozzles.productCount} products`}
+            label="Observed nozzles"
+            value={overview.nozzles.observed.toLocaleString()}
+            detail="Unique dispenser and nozzle pairs in telemetry"
           />
           <OverviewCard
             icon={<Activity />}
@@ -65,9 +64,9 @@ async function StationOverviewContent() {
           />
           <OverviewCard
             icon={<ShieldCheck />}
-            label="Station health"
+            label="Tank telemetry coverage"
             value={`${overview.health.percentage}%`}
-            detail={`${overview.health.healthy} of ${overview.health.total} equipment units healthy`}
+            detail={`Latest readings for ${overview.health.tanksReporting} of ${overview.health.totalTanks} tanks`}
           />
         </section>
 
@@ -133,7 +132,7 @@ async function StationOverviewContent() {
               className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-[#8dd9c7]"
               href="/nozzles"
             >
-              Review nozzles <ArrowUpRight className="size-4" />
+              Review tanks <ArrowUpRight className="size-4" />
             </Link>
           </div>
         </section>

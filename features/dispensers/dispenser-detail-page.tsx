@@ -8,22 +8,42 @@ import {
   EventTimeline,
   PropertyGrid,
   type ChildAsset,
+  type EquipmentEvent,
 } from "@/components/equipment/equipment-detail";
-import type { Dispenser, Nozzle } from "@/features/data";
+import type { DispenserAsset, DispenserTransaction, NozzleSummary } from "@/features/equipment/model";
 
-export default function DispenserDetailPage({ dispenser, nozzles }: { dispenser: Dispenser; nozzles: Nozzle[] }) {
-  const attachedNozzles: ChildAsset[] = nozzles.map((nozzle) => ({
+function formatNumber(value: number, unit = ""): string {
+  return `${value.toLocaleString()}${unit}`;
+}
+
+export default function DispenserDetailPage({
+  dispenser,
+  nozzles,
+  activity,
+}: {
+  dispenser: DispenserAsset;
+  nozzles: NozzleSummary[];
+  activity: DispenserTransaction[];
+}) {
+  const nozzleItems: ChildAsset[] = nozzles.map((nozzle) => ({
     id: nozzle.id,
-    name: `${nozzle.id} · ${nozzle.product}`,
+    name: `Nozzle ${nozzle.nozzleNumber}`,
     href: `/nozzles/${encodeURIComponent(nozzle.id)}`,
-    status: nozzle.status,
-    statusTone: nozzle.status === "Ready" ? "good" : nozzle.status === "In use" ? "info" : "warning",
-    description: `${nozzle.model} · meter ${nozzle.meterSerial}`,
+    status: "Observed",
+    statusTone: "info",
+    description: `Nozzle number ${nozzle.nozzleNumber} observed on dispenser telemetry.`,
     metrics: [
-      { label: "Flow", value: nozzle.flowRate },
-      { label: "Total volume", value: nozzle.totalVolume },
-      { label: "Calibration due", value: nozzle.calibrationDue },
+      { label: "Records", value: nozzle.transactionCount.toLocaleString() },
+      { label: "Volume", value: formatNumber(nozzle.totalVolume, " L") },
+      { label: "Amount", value: formatNumber(nozzle.totalAmount) },
     ],
+  }));
+  const recentEvents: EquipmentEvent[] = activity.slice(0, 8).map((transaction) => ({
+    id: transaction.id,
+    title: `Nozzle ${transaction.nozzleNumber} telemetry`,
+    description: `Volume ${formatNumber(transaction.volume ?? 0, " L")} · amount ${formatNumber(transaction.amount ?? 0)} · receipt ${transaction.receiptNumber}`,
+    time: transaction.datetime,
+    kind: "info",
   }));
 
   return (
@@ -32,52 +52,55 @@ export default function DispenserDetailPage({ dispenser, nozzles }: { dispenser:
         <DetailHeader
           backHref="/dispensers"
           backLabel="dispensers"
-          eyebrow="Dispenser"
-          parentHref={`/tanks/${encodeURIComponent(dispenser.tankId)}`}
-          parentLabel={`Tank ${dispenser.tankId}`}
-          title={dispenser.name}
-          id={dispenser.serial}
-          description={`${dispenser.manufacturer} ${dispenser.model} · ${dispenser.products.join(" / ")}`}
-          status={dispenser.status}
-          statusTone={dispenser.status === "Online" ? "good" : "warning"}
-          location={dispenser.location}
+          eyebrow="Dispenser inventory"
+          title={dispenser.serialNumber}
+          id={dispenser.id}
+          description={`Retail outlet ${dispenser.retailOutletId} · batch ${dispenser.batchNumber}`}
+          status={dispenser.latestTransaction ? "Telemetry recorded" : "No telemetry"}
+          statusTone={dispenser.latestTransaction ? "good" : "warning"}
+          location={`Retail outlet ${dispenser.retailOutletId}`}
         />
 
         <DetailMetrics items={[
-          { label: "Today's volume", value: dispenser.volume, note: `${dispenser.transactions} transactions today` },
-          { label: "Connected nozzles", value: String(nozzles.length), note: `${dispenser.products.length} products supported` },
-          { label: "Line pressure", value: dispenser.pressure, note: "Latest sensor reading" },
-          { label: "Next service", value: dispenser.serviceDue, note: `Heartbeat ${dispenser.lastHeartbeat}`, tone: dispenser.status === "Maintenance" ? "warning" : "good" },
+          { label: "Telemetry records", value: dispenser.transactionCount.toLocaleString(), note: "Records available for this dispenser" },
+          { label: "Observed volume", value: formatNumber(dispenser.totalVolume, " L"), note: "Sum of reported volume values" },
+          { label: "Observed amount", value: formatNumber(dispenser.totalAmount), note: "Sum of reported amount values" },
+          { label: "Observed nozzles", value: String(nozzles.length), note: "Unique nza values in telemetry" },
         ]} />
 
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-6">
             <ChildAssetList
-              title={`Attached nozzles · ${nozzles.length}`}
-              description="Per-nozzle readiness, metering totals, flow rate, and calibration state."
-              items={attachedNozzles}
-              emptyLabel="No nozzles are currently mapped to this dispenser."
+              title={`Observed nozzles · ${nozzles.length}`}
+              description="Nozzle numbers are derived from telemetry records for this dispenser serial."
+              items={nozzleItems}
+              emptyLabel="No nozzle numbers have been observed in telemetry for this dispenser."
             />
-            <EventTimeline items={dispenser.events} />
+            {recentEvents.length > 0 ? (
+              <EventTimeline items={recentEvents} />
+            ) : (
+              <DetailSection title="Recent telemetry" description="Latest records from dispensers_telemetry.">
+                <p className="text-sm text-slate-500">No telemetry records are available for this dispenser.</p>
+              </DetailSection>
+            )}
           </div>
           <div className="space-y-6">
-            <DetailSection title="Asset specifications" description="Controller, installation, and network information.">
+            <DetailSection title="Inventory record" description="Fields provided by the dispensers collection.">
               <PropertyGrid items={[
-                { label: "Manufacturer", value: dispenser.manufacturer },
-                { label: "Model", value: dispenser.model },
-                { label: "Serial number", value: dispenser.serial },
-                { label: "Parent tank", value: dispenser.tankId },
-                { label: "Products", value: dispenser.products.join(", ") },
-                { label: "Firmware", value: dispenser.firmware },
-                { label: "Installed", value: dispenser.installedAt },
-                { label: "Last heartbeat", value: dispenser.lastHeartbeat },
-                { label: "Service due", value: dispenser.serviceDue },
+                { label: "Dispenser ID", value: dispenser.id },
+                { label: "Serial number", value: dispenser.serialNumber },
+                { label: "Retail outlet", value: dispenser.retailOutletId },
+                { label: "Batch number", value: dispenser.batchNumber },
+                { label: "Customer type", value: dispenser.customerType },
+                { label: "Created", value: dispenser.createdAt },
+                { label: "Updated", value: dispenser.updatedAt },
+                { label: "Latest telemetry", value: dispenser.latestTransaction?.datetime ?? "—" },
               ]} />
             </DetailSection>
-            <DetailSection title="Analysis & reports" description="Investigate transaction, flow, and service patterns.">
-              <p className="text-sm leading-6 text-slate-500">Compare transaction activity with nozzle flow and service alerts to help isolate equipment issues.</p>
+            <DetailSection title="Transaction reports" description="Inspect telemetry events and reported transaction values.">
+              <p className="text-sm leading-6 text-slate-500">Transaction history is sourced from dispensers_telemetry for the configured retail outlet.</p>
               <Link href="/dispensers/reports" className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium text-[#17352f] hover:bg-[#f5faf8]">
-                Open transaction reports <ArrowUpRight aria-hidden="true" className="size-4" />
+                Open dispenser reports <ArrowUpRight aria-hidden="true" className="size-4" />
               </Link>
             </DetailSection>
           </div>

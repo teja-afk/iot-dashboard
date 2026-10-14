@@ -1,30 +1,38 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import {
-  ChildAssetList,
   DetailHeader,
   DetailMetrics,
   DetailSection,
   EventTimeline,
   PropertyGrid,
-  type ChildAsset,
+  type EquipmentEvent,
 } from "@/components/equipment/equipment-detail";
 import { TankLevelGraphic } from "@/features/tanks/components/tank-level-graphic";
-import type { Dispenser, Tank } from "@/features/data";
+import type { TankAsset, TankTelemetry } from "@/features/equipment/model";
 
-export default function TankDetailPage({ tank, dispensers }: { tank: Tank; dispensers: Dispenser[] }) {
-  const attachedDispensers: ChildAsset[] = dispensers.map((dispenser) => ({
-    id: dispenser.serial,
-    name: dispenser.name,
-    href: `/dispensers/${encodeURIComponent(dispenser.serial)}`,
-    status: dispenser.status,
-    statusTone: dispenser.status === "Online" ? "good" : "warning",
-    description: `${dispenser.manufacturer} ${dispenser.model} · ${dispenser.location}`,
-    metrics: [
-      { label: "Products", value: dispenser.products.join(" / ") },
-      { label: "Today's volume", value: dispenser.volume },
-      { label: "Transactions", value: String(dispenser.transactions) },
-    ],
+function formatReading(value: number | null, unit = ""): string {
+  return value === null ? "—" : `${value.toLocaleString()}${unit}`;
+}
+
+export default function TankDetailPage({
+  tank,
+  readings,
+}: {
+  tank: TankAsset;
+  readings: TankTelemetry[];
+}) {
+  const latest = tank.latestReading;
+  const events: EquipmentEvent[] = readings.slice(0, 8).map((reading) => ({
+    id: reading.id,
+    title: reading.atgProbeStatus === "active" ? "Tank telemetry received" : `Probe status: ${reading.atgProbeStatus}`,
+    description: [
+      `Fuel ${formatReading(reading.fuelLevelLiters, " L")}`,
+      `Water ${formatReading(reading.waterLevelLiters, " L")}`,
+      `Temperature ${formatReading(reading.temperature, "°")}`,
+    ].join(" · "),
+    time: reading.datetime,
+    kind: reading.atgProbeStatus === "active" ? "info" : "warning",
   }));
 
   return (
@@ -33,76 +41,64 @@ export default function TankDetailPage({ tank, dispensers }: { tank: Tank; dispe
         <DetailHeader
           backHref="/tanks"
           backLabel="tanks"
-          // eyebrow={`Tank / ${tank.product}`}
-          title={tank.name}
+          eyebrow="Tank telemetry"
+          title={tank.serialNumber === "—" ? `Tank ${tank.id}` : tank.serialNumber}
           id={tank.id}
-          description={`${tank.product} storage · ${tank.level} of ${tank.capacity} · last delivery ${tank.lastDelivery}`}
-          status={tank.status}
-          statusTone={tank.status === "Healthy" ? "good" : tank.status === "Low level" ? "warning" : "critical"}
-          location={tank.location}
+          description={`Retail outlet ${tank.retailOutletId} · latest probe status ${tank.probeStatus}`}
+          status={tank.probeStatus}
+          statusTone={tank.probeStatus.toLowerCase() === "active" ? "good" : "warning"}
+          location={`Tank ${tank.id}`}
         />
 
         <DetailMetrics items={[
-          { label: "Current contents", value: tank.level, note: `${tank.levelPercent}% of capacity`, tone: tank.status === "Healthy" ? "good" : "warning" },
-          { label: "Water level", value: tank.waterPercent === null ? "Not applicable" : `${tank.waterPercent}%`, note: tank.waterPercent !== null && tank.waterPercent >= 4 ? "Inspect water accumulation" : "Within operating range", tone: tank.waterPercent !== null && tank.waterPercent >= 4 ? "warning" : "good" },
-          { label: "Temperature", value: tank.temperature, note: "Latest probe reading" },
-          { label: "Next maintenance", value: tank.maintenanceDue, note: `Last inspection ${tank.lastInspection}` },
+          { label: "Fuel level", value: formatReading(latest?.fuelLevelLiters ?? null, " L"), note: "Latest tank telemetry" },
+          { label: "Water volume", value: formatReading(latest?.waterLevelLiters ?? null, " L"), note: `Water height ${formatReading(latest?.waterLevelMm ?? null, " mm")}` },
+          { label: "Temperature", value: formatReading(latest?.temperature ?? null, "°"), note: "Latest probe reading" },
+          { label: "Ullage", value: formatReading(latest?.ullageLiters ?? null, " L"), note: "Reported by tank telemetry" },
         ]} />
 
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-6">
-            <DetailSection title="Tank telemetry" description="Current levels and connected sensor health.">
-              <div className="grid gap-6 md:grid-cols-[minmax(220px,0.7fr)_minmax(0,1.3fr)] md:items-center">
+            <DetailSection title="Current tank contents" description="The graphic compares reported fuel and water volumes; tank capacity is not present in the source records.">
+              <div className="grid gap-6 md:grid-cols-[minmax(220px,0.8fr)_minmax(0,1.2fr)] md:items-center">
                 <TankLevelGraphic
                   id={tank.id}
-                  product={tank.product}
-                  levelPercent={tank.levelPercent}
-                  waterPercent={tank.waterPercent}
+                  fuelLevelLiters={latest?.fuelLevelLiters ?? null}
+                  waterLevelLiters={latest?.waterLevelLiters ?? null}
                 />
-                <div className="space-y-5">
-                  <div>
-                    <div className="mb-2 flex justify-between text-sm"><span className="text-slate-500">Available volume</span><span className="font-semibold text-[#17352f]">{tank.levelPercent}%</span></div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#16806c]" style={{ width: `${tank.levelPercent}%` }} /></div>
-                    <p className="mt-2 text-xs text-slate-400">{tank.level} available · {tank.capacity} maximum</p>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {tank.sensors.map((sensor) => (
-                      <div key={sensor.name} className="rounded-lg border border-[#edf3f0] p-3">
-                        <p className="text-xs text-slate-500">{sensor.name}</p>
-                        <p className="mt-1 text-sm font-semibold text-[#17352f]">{sensor.reading}</p>
-                        <p className={`mt-1 text-[11px] ${sensor.status === "Online" ? "text-emerald-700" : "text-amber-700"}`}>{sensor.status}</p>
-                      </div>
-                    ))}
-                  </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ReadingTile label="Probe status" value={latest?.atgProbeStatus ?? tank.probeStatus} />
+                  <ReadingTile label="Water height" value={formatReading(latest?.waterLevelMm ?? null, " mm")} />
+                  <ReadingTile label="Density" value={formatReading(latest?.density ?? null)} />
+                  <ReadingTile label="Latest timestamp" value={latest?.datetime ?? "No telemetry received"} />
                 </div>
               </div>
             </DetailSection>
-            <ChildAssetList
-              title={`Connected dispensers · ${dispensers.length}`}
-              description="Equipment supplied by this tank. Select a dispenser to inspect its nozzles and diagnostics."
-              items={attachedDispensers}
-              emptyLabel="No dispensers are currently mapped to this tank."
-            />
-            <EventTimeline items={tank.events} />
+            {events.length > 0 ? (
+              <EventTimeline items={events} />
+            ) : (
+              <DetailSection title="Recent tank readings" description="Latest records from tank_telemetry for this tank.">
+                <p className="text-sm text-slate-500">No telemetry records are available for this tank.</p>
+              </DetailSection>
+            )}
           </div>
 
           <div className="space-y-6">
-            <DetailSection title="Asset specifications" description="Identification and service configuration.">
+            <DetailSection title="Tank inventory record" description="Fields supplied by the tanks collection.">
               <PropertyGrid items={[
-                { label: "Manufacturer", value: tank.manufacturer },
-                { label: "Model", value: tank.model },
-                { label: "Serial number", value: tank.serial },
-                { label: "Product", value: tank.product },
-                { label: "Capacity", value: tank.capacity },
-                { label: "Firmware", value: tank.firmware },
-                { label: "Installed", value: tank.installedAt },
-                { label: "Last delivery", value: tank.lastDelivery },
-                { label: "Last inspection", value: tank.lastInspection },
-                { label: "Maintenance due", value: tank.maintenanceDue },
+                { label: "Tank ID", value: tank.id },
+                { label: "Serial number", value: tank.serialNumber },
+                { label: "Retail outlet", value: tank.retailOutletId },
+                { label: "ATG probe", value: tank.probeStatus },
+                { label: "Height", value: formatReading(tank.height, " mm") },
+                { label: "Width", value: formatReading(tank.width, " mm") },
+                { label: "Customer type", value: tank.customerType },
+                { label: "Created", value: tank.createdAt },
+                { label: "Updated", value: tank.updatedAt },
               ]} />
             </DetailSection>
-            <DetailSection title="Analysis & reports" description="Use history to investigate trends and plan service work.">
-              <p className="text-sm leading-6 text-slate-500">Review delivery history, level changes, and sensor readings together before scheduling a maintenance task.</p>
+            <DetailSection title="Tank reports" description="Review readings and probe activity for this outlet.">
+              <p className="text-sm leading-6 text-slate-500">The tank report lists the telemetry readings available in MongoDB.</p>
               <Link href="/tanks/reports" className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium text-[#17352f] hover:bg-[#f5faf8]">
                 Open tank reports <ArrowUpRight aria-hidden="true" className="size-4" />
               </Link>
@@ -111,5 +107,14 @@ export default function TankDetailPage({ tank, dispensers }: { tank: Tank; dispe
         </section>
       </div>
     </main>
+  );
+}
+
+function ReadingTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-[#edf3f0] p-3">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 wrap-break-word text-sm font-semibold text-[#17352f]">{value}</p>
+    </div>
   );
 }

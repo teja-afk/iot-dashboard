@@ -5,27 +5,28 @@ export default async function NozzlePage() {
   const nozzles = await listNozzles();
   const items: OverviewItem[] = nozzles.map((nozzle) => ({
     id: nozzle.id,
-    name: `${nozzle.id} · ${nozzle.product}`,
-    subtitle: `Attached to ${nozzle.dispenser}`,
+    name: `Nozzle ${nozzle.nozzleNumber}`,
+    subtitle: `Observed on dispenser ${nozzle.dispenserSerial}`,
     href: `/nozzles/${encodeURIComponent(nozzle.id)}`,
-    status: nozzle.status,
-    statusTone: nozzle.status === "Ready" ? "good" : nozzle.status === "In use" ? "info" : "warning",
+    status: "Observed",
+    statusTone: "good",
     icon: "nozzle",
     metrics: [
-      { label: "Flow rate", value: nozzle.flowRate },
-      { label: "Total volume", value: nozzle.totalVolume },
-      { label: "Transactions", value: String(nozzle.transactions) },
-      { label: "Calibration due", value: nozzle.calibrationDue },
+      { label: "Telemetry records", value: nozzle.transactionCount.toLocaleString() },
+      { label: "Recorded volume", value: `${nozzle.totalVolume.toLocaleString()} L` },
+      { label: "Recorded amount", value: nozzle.totalAmount.toLocaleString() },
+      { label: "Last activity", value: nozzle.latestTransaction?.datetime ?? "—" },
     ],
   }));
 
   return (
     <EquipmentOverview
       title="Nozzle overview"
-      description="Scan nozzle readiness, flow, and calibration at a glance. Open a nozzle to review meter information and service history."
-      searchPlaceholder="Search nozzle ID, product, or dispenser"
+      description="Nozzles are derived from unique dispenser and nozzle pairs seen in dispenser telemetry."
+      searchPlaceholder="Search dispenser serial or nozzle number"
       items={items}
       reportsHref="/nozzles/reports"
+      statusSummaryLabel="observed"
     />
   );
 }

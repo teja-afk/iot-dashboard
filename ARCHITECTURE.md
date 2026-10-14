@@ -25,7 +25,7 @@ lib/                         Small app-wide utilities only
 public/                      Static assets
 ```
 
-Feature modules keep server-side async query functions in `repository.ts` and screens beside them. The shared `features/data.ts` module defines equipment types and the `seedData` document used to populate MongoDB. As a feature grows, split into `components/`, `hooks/`, `services/`, `types/`, and `data/` subfolders only when that makes ownership or reuse clearer; avoid empty folders and abstraction for its own sake.
+Feature modules keep server-side async query functions in `repository.ts` and screens beside them. Shared MongoDB equipment shapes and query helpers live in `features/equipment/`; they normalize current inventory and telemetry collections before the UI consumes them. As a feature grows, split into `components/`, `hooks/`, `services/`, `types/`, and `data/` subfolders only when that makes ownership or reuse clearer; avoid empty folders and abstraction for its own sake.
 
 ## Dependency rules
 
@@ -46,7 +46,7 @@ Feature modules keep server-side async query functions in `repository.ts` and sc
 
 ## Current data boundary
 
-`features/data.ts` exports domain types and seed records mapped to separate `stations`, `tanks`, `dispensers`, `nozzles`, and `transactions` collections. `features/mongodb-repository.ts` performs server-only collection queries, scoped by `MONGODB_STATION_ID`; `lib/mongodb.ts` owns the shared client. Configure `MONGODB_URI`, optionally `MONGODB_DATABASE` and `MONGODB_STATION_ID`, in `.env.local`. Run `npm run seed:mongodb` to upsert the demo records and create relationship indexes. Do not import database code into Client Components: report route components fetch records and pass them to interactive client screens. Telemetry is not yet modeled and should be stored independently as a time-series collection as the application grows. Reads currently run uncached for fresh operational data.
+Equipment screens read outlet-scoped records from `tanks`, `tank_telemetry`, `dispensers`, and `dispensers_telemetry` using `MONGODB_RETAIL_OUTLET_ID`. Nozzles are derived from unique `(serial_no, nza)` telemetry pairs because there is no standalone nozzle collection in this schema. Configure `MONGODB_URI`, `MONGODB_DATABASE`, and `MONGODB_RETAIL_OUTLET_ID` in `.env.local`. Keep database access in server-only repositories; pass normalized display data to client components rather than importing MongoDB code into them. Reads run uncached so screens reflect current database records. The former demo fixture seeder is retired because it targets the old schema.
 
 ## Authentication status
 
