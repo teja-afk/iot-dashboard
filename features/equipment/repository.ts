@@ -50,6 +50,7 @@ interface DispenserDocument extends Document {
 interface DispenserTelemetryDocument extends Document {
   retail_outlet?: string | number;
   serial_no?: string | number;
+  du_sr_no?: string | number;
   nza?: string | number;
   amount?: number;
   volume?: number;
@@ -115,13 +116,13 @@ function mapTankReading(document: TankTelemetryDocument): TankTelemetry {
 }
 
 function mapTransaction(document: DispenserTelemetryDocument): DispenserTransaction {
-  const serial = text(document.serial_no, "Unknown dispenser");
+  const serial = text(document.serial_no || document.du_sr_no, "Unknown dispenser");
   const nozzle = text(document.nza, "Unknown nozzle");
   const datetime = dateText(document.datetime ?? document.dts);
   const receipt = text(document.receipt_no, text(document.local_id, "record"));
   return {
     id: `${serial}:${nozzle}:${datetime}:${receipt}`,
-    retailOutletId: text(document.retail_outlet),
+    retailOutletId: text(document.retail_outlet, getOutletId()),
     datetime,
     dispenserSerial: serial,
     nozzleNumber: nozzle,
@@ -196,12 +197,30 @@ async function loadTankTelemetry(tankId?: string): Promise<TankTelemetry[]> {
 async function loadDispenserTelemetry(serialNumber?: string): Promise<DispenserTransaction[]> {
   const database = await getMongoDatabase();
   const filter: Filter<DispenserTelemetryDocument> = {};
-  if (serialNumber !== undefined) filter.serial_no = { $in: [serialNumber, Number(serialNumber)].filter((value) => typeof value === "string" || Number.isFinite(value)) };
-  const documents = await database.collection<DispenserTelemetryDocument>("dispensers_telemetry")
+  if (serialNumber !== undefined) {
+    const serialValues = [serialNumber, Number(serialNumber)].filter(
+      (value) => typeof value === "string" || Number.isFinite(value),
+    );
+    filter.$or = [
+      { serial_no: { $in: serialValues } },
+      { du_sr_no: { $in: serialValues } },
+    ];
+  }
+
+  let documents = await database.collection<DispenserTelemetryDocument>("dispenser_telemetry")
     .find(filter)
     .sort({ datetime: -1, dts: -1 })
     .limit(MAX_TELEMETRY_RECORDS)
     .toArray();
+
+  if (documents.length === 0) {
+    documents = await database.collection<DispenserTelemetryDocument>("dispensers_telemetry")
+      .find(filter)
+      .sort({ datetime: -1, dts: -1 })
+      .limit(MAX_TELEMETRY_RECORDS)
+      .toArray();
+  }
+
   return documents.map(mapTransaction);
 }
 
@@ -272,16 +291,28 @@ export async function getDispenserBySerial(serialNumber: string): Promise<Dispen
 }
 
 export async function listNozzles(): Promise<NozzleSummary[]> {
-  return summarizeNozzles(await loadDispenserTelemetry());
+  const [dispensers, transactions] = await Promise.all([
+    listDispensers(),
+    loadDispenserTelemetry(),
+  ]);
+  if (dispensers.length === 0) {
+    return summarizeNozzles(transactions);
+  }
+  const outletSerials = new Set(dispensers.map((d) => d.serialNumber));
+  const filtered = transactions.filter((t) => outletSerials.has(t.dispenserSerial));
+  return summarizeNozzles(filtered.length > 0 ? filtered : transactions);
 }
 
-export async function getNozzleById(id: string): Promise<NozzleSummary | undefined> {
+export async function getNozzleById(rawId: string): Promise<NozzleSummary | undefined> {
+  const id = decodeURIComponent(rawId);
   const lastSeparator = id.lastIndexOf(":");
   if (lastSeparator < 1) return undefined;
   const serialNumber = id.slice(0, lastSeparator);
   const nozzleNumber = id.slice(lastSeparator + 1);
   return (await listNozzles()).find((nozzle) =>
-    nozzle.dispenserSerial === serialNumber && nozzle.nozzleNumber === nozzleNumber,
+    nozzle.id === rawId ||
+    nozzle.id === id ||
+    (nozzle.dispenserSerial === serialNumber && nozzle.nozzleNumber === nozzleNumber),
   );
 }
 

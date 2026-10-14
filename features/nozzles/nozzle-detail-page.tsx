@@ -73,7 +73,7 @@ export default function NozzleDetailPage({
               ]} />
             </DetailSection>
             <DetailSection title="Nozzle report" description="Review all telemetry records for this dispenser and nozzle pair.">
-              <p className="text-sm leading-6 text-slate-500">Nozzle history is derived from the dispensers_telemetry collection.</p>
+              <p className="text-sm leading-6 text-slate-500">Nozzle history is derived from the dispenser_telemetry collection.</p>
               <Link href="/nozzles/reports" className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium text-[#17352f] hover:bg-[#f5faf8]">
                 Open nozzle reports <ArrowUpRight aria-hidden="true" className="size-4" />
               </Link>

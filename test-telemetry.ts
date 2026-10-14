@@ -1,10 +1,10 @@
 import { getMongoDatabase } from "@/lib/mongodb";
-import type { DispenserTelemetryDocument } from "@/features/equipment/model";
+import type { Document } from "mongodb";
 
 async function testLoadDispenserTelemetry() {
   try {
     const database = await getMongoDatabase();
-    const documents = await database.collection<DispenserTelemetryDocument>("dispenser_telemetry")
+    const documents = await database.collection<Document>("dispenser_telemetry")
       .find({})
       .limit(5)
       .toArray();

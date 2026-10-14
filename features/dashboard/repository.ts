@@ -30,6 +30,7 @@ interface DispenserRecord extends Document {
 interface DispenserTelemetryRecord extends Document {
   retail_outlet?: string | number;
   serial_no?: string;
+  du_sr_no?: string;
   nza?: string | number;
   amount?: number;
   volume?: number;
@@ -102,7 +103,7 @@ export async function getStationOverview(now = new Date()): Promise<StationOverv
   const retailOutletId = getOutletId();
   const outletValues = outletIdValues(retailOutletId);
 
-  const [tanks, tankTelemetry, dispensers, dispenserTelemetry] = await Promise.all([
+  const [tanks, tankTelemetry, dispensers] = await Promise.all([
     database.collection<TankRecord>("tanks")
       .find({ retail_outlet_id: { $in: outletValues } })
       .toArray(),
@@ -113,12 +114,40 @@ export async function getStationOverview(now = new Date()): Promise<StationOverv
     database.collection<DispenserRecord>("dispensers")
       .find({ retail_outlet_id: { $in: outletValues } })
       .toArray(),
-    database.collection<DispenserTelemetryRecord>("dispensers_telemetry")
-      .find({ retail_outlet: { $in: outletValues } })
+  ]);
+
+  const dispenserSerials = dispensers
+    .flatMap((d) => [d.dispenser_serial_no, d.id])
+    .filter((s): s is string => Boolean(s));
+
+  const telemetryFilter = dispenserSerials.length > 0
+    ? {
+        $or: [
+          { retail_outlet: { $in: outletValues } },
+          { serial_no: { $in: dispenserSerials } },
+          { du_sr_no: { $in: dispenserSerials } },
+        ],
+      }
+    : {
+        $or: [
+          { retail_outlet: { $in: outletValues } },
+          {},
+        ],
+      };
+
+  let dispenserTelemetry = await database.collection<DispenserTelemetryRecord>("dispenser_telemetry")
+    .find(telemetryFilter)
+    .sort({ datetime: -1, dts: -1 })
+    .limit(5000)
+    .toArray();
+
+  if (dispenserTelemetry.length === 0) {
+    dispenserTelemetry = await database.collection<DispenserTelemetryRecord>("dispensers_telemetry")
+      .find(telemetryFilter)
       .sort({ datetime: -1, dts: -1 })
       .limit(5000)
-      .toArray(),
-  ]);
+      .toArray();
+  }
 
   const latestTankTelemetry = new Map<string, TankTelemetryRecord>();
   for (const reading of tankTelemetry) {
@@ -154,11 +183,12 @@ export async function getStationOverview(now = new Date()): Promise<StationOverv
   });
 
   const observedNozzles = new Set(
-    dispenserTelemetry.flatMap((record) =>
-      record.serial_no != null && record.nza != null
-        ? [`${record.serial_no}:${record.nza}`]
-        : [],
-    ),
+    dispenserTelemetry.flatMap((record) => {
+      const serial = record.serial_no ?? record.du_sr_no;
+      return serial != null && record.nza != null
+        ? [`${serial}:${record.nza}`]
+        : [];
+    }),
   );
   const alerts: StationAlert[] = [];
 

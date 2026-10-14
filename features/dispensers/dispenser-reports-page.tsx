@@ -20,7 +20,7 @@ export default function DispenserReportsPage({ transactions }: { transactions: D
       <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6">
         <header>
           <h1 className="text-3xl font-semibold tracking-tight text-[#17352f]">Dispenser telemetry</h1>
-          <p className="mt-2 text-sm text-slate-500">Transaction-like records from dispensers_telemetry for the configured retail outlet.</p>
+          <p className="mt-2 text-sm text-slate-500">Transaction-like records from dispenser_telemetry for the configured retail outlet.</p>
         </header>
         <DataTable
           label="Dispenser telemetry"

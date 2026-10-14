@@ -62,8 +62,8 @@ export function EquipmentOverview({
       <div className="mx-auto max-w-7xl space-y-7">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#16806c]">Equipment network</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#17352f]">{title}</h1>
+            
+            <h1 className="text-3xl font-semibold tracking-tight text-[#17352f]">{title}</h1>
             <p className="mt-2 text-sm text-slate-500">{description}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

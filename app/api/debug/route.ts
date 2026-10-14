@@ -5,35 +5,24 @@ export async function GET() {
   try {
     const db = await getMongoDatabase();
     
-    // Test loading dispenser telemetry WITHOUT outlet filter
-    const dispenserTelemetryCount = await db.collection("dispenser_telemetry").estimatedDocumentCount();
-    const dispenserTelemetrySamples = await db.collection("dispenser_telemetry")
-      .find({})
-      .limit(5)
-      .toArray();
-    
-    // Test loading transactions WITHOUT outlet filter
-    const transactionsCount = await db.collection("transactions").estimatedDocumentCount();
-    const transactionsSamples = await db.collection("transactions")
-      .find({})
-      .limit(5)
-      .toArray();
-    
+    const { listNozzles } = await import("@/features/nozzles/repository");
+    const { getStationOverview } = await import("@/features/dashboard/repository");
+    const { listDispensers } = await import("@/features/dispensers/repository");
+
+    const nozzles = await listNozzles();
+    const stationOverview = await getStationOverview();
+    const dispensers = await listDispensers();
+
     return NextResponse.json({
-      dispenserTelemetryCount,
-      dispenserTelemetrySamples: dispenserTelemetrySamples.map(sample => ({
-        _id: sample._id,
-        ...Object.fromEntries(
-          Object.entries(sample).filter(([k]) => !k.startsWith('_') && k !== '_id')
-        )
+      nozzles,
+      dispensersCount: dispensers.length,
+      dispensersWithNozzles: dispensers.map(d => ({
+        id: d.id,
+        serialNumber: d.serialNumber,
+        nozzles: d.nozzles,
+        transactionCount: d.transactionCount,
       })),
-      transactionsCount,
-      transactionsSamples: transactionsSamples.map(sample => ({
-        _id: sample._id,
-        ...Object.fromEntries(
-          Object.entries(sample).filter(([k]) => !k.startsWith('_') && k !== '_id')
-        )
-      })),
+      stationOverviewNozzles: stationOverview.nozzles,
     });
   } catch (error: any) {
     return NextResponse.json(

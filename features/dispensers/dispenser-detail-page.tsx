@@ -79,7 +79,7 @@ export default function DispenserDetailPage({
             {recentEvents.length > 0 ? (
               <EventTimeline items={recentEvents} />
             ) : (
-              <DetailSection title="Recent telemetry" description="Latest records from dispensers_telemetry.">
+              <DetailSection title="Recent telemetry" description="Latest records from dispenser_telemetry.">
                 <p className="text-sm text-slate-500">No telemetry records are available for this dispenser.</p>
               </DetailSection>
             )}
@@ -98,7 +98,7 @@ export default function DispenserDetailPage({
               ]} />
             </DetailSection>
             <DetailSection title="Transaction reports" description="Inspect telemetry events and reported transaction values.">
-              <p className="text-sm leading-6 text-slate-500">Transaction history is sourced from dispensers_telemetry for the configured retail outlet.</p>
+              <p className="text-sm leading-6 text-slate-500">Transaction history is sourced from dispenser_telemetry for the configured retail outlet.</p>
               <Link href="/dispensers/reports" className="mt-4 inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium text-[#17352f] hover:bg-[#f5faf8]">
                 Open dispenser reports <ArrowUpRight aria-hidden="true" className="size-4" />
               </Link>
