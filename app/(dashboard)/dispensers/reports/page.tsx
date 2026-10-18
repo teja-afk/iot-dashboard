@@ -1,7 +1,9 @@
-import DispenserReportsPage from "@/features/dispensers/dispenser-reports-page";
-import { listTransactions } from "@/features/dispensers/repository";
+import { DispenserReports } from "@/components/dispensers/dispenser-reports";
+import { listDispenserTransactions } from "@/lib/data";
+import { getSelectedOutletId } from "@/lib/station-cookie";
 
 export default async function Page() {
-	const transactions = await listTransactions();
-	return <DispenserReportsPage transactions={transactions} />;
+  const outletId = await getSelectedOutletId();
+  const transactions = await listDispenserTransactions(undefined, outletId);
+  return <DispenserReports transactions={transactions} />;
 }

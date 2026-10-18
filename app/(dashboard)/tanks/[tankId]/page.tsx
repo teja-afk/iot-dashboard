@@ -1,14 +1,13 @@
 import { notFound } from "next/navigation";
-import TankDetailPage from "@/features/tanks/tank-detail-page";
-import { getTankById, listTankReadings } from "@/features/tanks/repository";
+import TankDetailPage from "@/components/tanks/tank-detail";
+import { getTankById } from "@/lib/data";
+import { getSelectedOutletId } from "@/lib/station-cookie";
 
 export default async function Page({ params }: { params: Promise<{ tankId: string }> }) {
   const { tankId } = await params;
-  const [tank, readings] = await Promise.all([
-    getTankById(tankId),
-    listTankReadings(tankId),
-  ]);
+  const outletId = await getSelectedOutletId();
+  const tank = await getTankById(tankId, outletId);
   if (!tank) notFound();
 
-  return <TankDetailPage tank={tank} readings={readings} />;
+  return <TankDetailPage params={params} />;
 }

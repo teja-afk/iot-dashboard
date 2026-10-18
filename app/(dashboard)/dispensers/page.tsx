@@ -1,1 +1,3 @@
-export { default } from "@/features/dispensers/dispenser-page";
+import DispenserListPage from "@/components/dispensers/dispenser-list";
+
+export default DispenserListPage;

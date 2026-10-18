@@ -34,7 +34,8 @@ export function NavMain({
         {items.map((item) => {
           const itemIsActive =
             matchesRoute(pathname, item.url) ||
-            (item.url === "/tanks" && pathname.startsWith("/tank/"));
+            (item.url === "/tanks" && pathname.startsWith("/tank/")) ||
+            (item.url === "/stations" && pathname.startsWith("/stations/"));
 
           return (
             <SidebarMenuItem key={item.title}>

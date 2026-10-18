@@ -1,15 +1,13 @@
 import { notFound } from "next/navigation";
-import NozzleDetailPage from "@/features/nozzles/nozzle-detail-page";
-import { getNozzleById } from "@/features/nozzles/repository";
-import { listTransactions } from "@/features/dispensers/repository";
+import NozzleDetailPage from "@/components/nozzles/nozzle-detail";
+import { getNozzleById } from "@/lib/data";
+import { getSelectedOutletId } from "@/lib/station-cookie";
 
 export default async function Page({ params }: { params: Promise<{ nozzleId: string }> }) {
   const { nozzleId } = await params;
-  const nozzle = await getNozzleById(nozzleId);
+  const outletId = await getSelectedOutletId();
+  const nozzle = await getNozzleById(nozzleId, outletId);
   if (!nozzle) notFound();
 
-  const transactions = (await listTransactions(nozzle.dispenserSerial)).filter(
-    (transaction) => transaction.nozzleNumber === nozzle.nozzleNumber,
-  );
-  return <NozzleDetailPage nozzle={nozzle} transactions={transactions} />;
+  return <NozzleDetailPage params={params} />;
 }

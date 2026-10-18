@@ -1,7 +1,9 @@
-import TankReportsPage from "@/features/tanks/tank-reports-page";
-import { listTankReadings } from "@/features/tanks/repository";
+import { TankReports } from "@/components/tanks/tank-reports";
+import { listTankReadings } from "@/lib/data";
+import { getSelectedOutletId } from "@/lib/station-cookie";
 
 export default async function Page() {
-	const readings = await listTankReadings();
-	return <TankReportsPage readings={readings} />;
+  const outletId = await getSelectedOutletId();
+  const readings = await listTankReadings(undefined, outletId);
+  return <TankReports readings={readings} />;
 }

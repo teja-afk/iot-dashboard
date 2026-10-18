@@ -1,1 +1,3 @@
-export { default } from "@/features/tanks/tank-page";
+import TankListPage from "@/components/tanks/tank-list";
+
+export default TankListPage;

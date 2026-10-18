@@ -1,18 +1,38 @@
-import { AppSidebar } from "@/components/app-sidebar";
-import { DashboardHeader } from "@/components/dashboard-header";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { countDispensers, countNozzles, countStations, countTanks, listStations } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // Add the server-side session guard here when the auth provider is connected.
+  const [stations, stationCount] = await Promise.all([
+    listStations(),
+    countStations(),
+  ]);
+  const stationOptions = stations.map((s) => ({
+    id: s.id,
+    name: s.name,
+    retailOutletId: s.retailOutletId,
+  }));
+  const [tankCount, dispenserCount, nozzleCount] = await Promise.all([
+    countTanks(),
+    countDispensers(),
+    countNozzles(),
+  ]);
+
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar
+        stationCount={stationCount}
+        tankCount={tankCount}
+        dispenserCount={dispenserCount}
+        nozzleCount={nozzleCount}
+      />
       <main className="min-w-0 flex-1">
-        <DashboardHeader />
+        <DashboardHeader stations={stationOptions} />
         {children}
       </main>
     </SidebarProvider>

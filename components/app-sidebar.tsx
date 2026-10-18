@@ -13,7 +13,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { GalleryVerticalEndIcon, LayoutDashboardIcon, DatabaseIcon, FuelIcon, CableIcon } from "lucide-react"
+import { GalleryVerticalEndIcon, LayoutDashboardIcon, DatabaseIcon, FuelIcon, CableIcon, Building2Icon } from "lucide-react"
 
 const data = {
   user: {
@@ -52,6 +52,14 @@ const data = {
       url: "/nozzles",
       icon: (
         <CableIcon
+        />
+      ),
+    },
+    {
+      title: "Stations",
+      url: "/stations",
+      icon: (
+        <Building2Icon
         />
       ),
     },
