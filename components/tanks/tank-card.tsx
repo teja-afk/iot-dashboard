@@ -12,16 +12,11 @@ export function TankCard({ tank }: { tank: TankAsset }) {
     >
       <Card className="gap-4 border-[#dce9e5] transition-shadow group-hover:shadow-md">
         <CardHeader className="grid-cols-[minmax(0,1fr)_auto] items-start">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f1] text-[#16806c]">
-              <span aria-hidden="true" className="size-5">&#x1F3FA;</span>
-            </span>
-            <div className="min-w-0">
-              <CardTitle className="truncate text-base text-[#17352f]">
-                {tank.serialNumber === "—" ? `Tank ${tank.id}` : tank.serialNumber}
-              </CardTitle>
-              <p className="mt-1 truncate font-mono text-xs text-slate-400">{tank.id}</p>
-            </div>
+          <div className="min-w-0">
+            <CardTitle className="truncate text-base text-[#17352f]">
+              {tank.serialNumber === "—" ? `Tank ${tank.id}` : tank.serialNumber}
+            </CardTitle>
+            <p className="mt-1 truncate font-mono text-xs text-slate-400">{tank.id}</p>
           </div>
           <Badge className={tank.probeStatus.toLowerCase() === "active" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}>
             {tank.probeStatus}

@@ -24,6 +24,7 @@ export function AssetList({
   items,
   reportsHref,
   statusSummaryLabel = "healthy",
+  columns = 3,
 }: {
   title: string;
   description: string;
@@ -31,6 +32,7 @@ export function AssetList({
   items: OverviewItem[];
   reportsHref: string;
   statusSummaryLabel?: string;
+  columns?: 3 | 4;
 }) {
   const [query, setQuery] = useState("");
   const visibleItems = useMemo(() => {
@@ -75,18 +77,23 @@ export function AssetList({
         </div>
 
         {visibleItems.length > 0 ? (
-          <section aria-label={`${title} list`} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {visibleItems.map((item) => {
-              const Icon = iconMap[item.icon];
-              return (
-                <Link key={item.id} href={item.href} className="group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#16806c]">
-                  <Card className="gap-4 border-[#dce9e5] transition-shadow group-hover:shadow-md">
-                    <CardHeader className="grid-cols-[minmax(0,1fr)_auto] items-start">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f1] text-[#16806c]">
-                          <Icon aria-hidden="true" className="size-5" />
-                        </span>
-                        <div className="min-w-0">
+          <section
+            aria-label={`${title} list`}
+            className={`grid gap-4 sm:grid-cols-2 ${columns === 4 ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}
+          >
+{visibleItems.map((item) => {
+               const Icon = item.icon ? iconMap[item.icon] : undefined;
+               return (
+                 <Link key={item.id} href={item.href} className="group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#16806c]">
+                   <Card className="gap-4 border-[#dce9e5] transition-shadow group-hover:shadow-md">
+                     <CardHeader className="grid-cols-[minmax(0,1fr)_auto] items-start">
+                       <div className="flex min-w-0 items-start gap-3">
+                         {Icon ? (
+                           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f1] text-[#16806c]">
+                             <Icon aria-hidden="true" className="size-5" />
+                           </span>
+                         ) : null}
+                         <div className="min-w-0">
                           <CardTitle className="truncate text-base text-[#17352f]">{item.name}</CardTitle>
                           <p className="mt-1 truncate font-mono text-xs text-slate-400">{item.id}</p>
                         </div>

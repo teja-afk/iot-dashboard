@@ -185,7 +185,7 @@ export type OverviewItem = {
   href: string;
   status: string;
   statusTone: "good" | "warning" | "critical" | "info";
-  icon: "tank" | "dispenser" | "nozzle";
+  icon?: "tank" | "dispenser" | "nozzle";
   metrics: { label: string; value: string }[];
   progress?: number;
   progressLabel?: string;

@@ -18,6 +18,7 @@ export default function StationListPage({ stations }: { stations: StationRecord[
       stations.filter(
         (s) =>
           s.name.toLowerCase().includes(query.toLowerCase()) ||
+          s.id.toLowerCase().includes(query.toLowerCase()) ||
           s.retailOutletId.toLowerCase().includes(query.toLowerCase()),
       ),
     [stations, query],

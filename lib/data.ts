@@ -89,8 +89,47 @@ interface StationDocument extends Document {
 
 const MAX_TELEMETRY_RECORDS = 10_000;
 
-function resolveOutletId(input?: OutletId | string): OutletId {
-  return input ? outletId(input as string) : DEFAULT_OUTLET_ID;
+let defaultOutletPromise: Promise<OutletId> | undefined;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * The outlet a station belongs to. Station documents either carry an explicit
+ * `retail_outlet_id` or use their own `id` as the retail outlet identifier,
+ * which is how the tanks/dispensers collections reference them.
+ */
+function stationOutletId(document: StationDocument): OutletId {
+  return outletId(
+    text(document.retail_outlet_id, String(document.id ?? DEFAULT_OUTLET_ID)),
+  );
+}
+
+/**
+ * Without an explicit selection the dashboard falls back to the first station
+ * in the database so every page still resolves to a real outlet.
+ */
+async function getDefaultOutletId(): Promise<OutletId> {
+  if (process.env.MONGODB_RETAIL_OUTLET_ID) return DEFAULT_OUTLET_ID;
+  if (!defaultOutletPromise) {
+    defaultOutletPromise = (async () => {
+      const database = await getMongoDatabase();
+      const document = await database
+        .collection<StationDocument>("stations")
+        .findOne({}, { sort: { id: 1 }, projection: { id: 1, retail_outlet_id: 1 } });
+      if (!document) return DEFAULT_OUTLET_ID;
+      return stationOutletId(document);
+    })().catch((error: unknown) => {
+      defaultOutletPromise = undefined;
+      throw error;
+    });
+  }
+  return defaultOutletPromise;
+}
+
+async function resolveOutletId(input?: OutletId | string): Promise<OutletId> {
+  return input ? outletId(input as string) : getDefaultOutletId();
 }
 
 function outletIdValues(input: OutletId | string): Array<string | number> {
@@ -100,11 +139,12 @@ function outletIdValues(input: OutletId | string): Array<string | number> {
   return values;
 }
 
-function outletFilter(
+async function outletFilter(
   field: "retail_outlet_id" | "retail_outlet",
   input?: OutletId | string,
-): Filter<Document> {
-  return { [field]: { $in: outletIdValues(resolveOutletId(input)) } };
+): Promise<Filter<Document>> {
+  const resolved = await resolveOutletId(input);
+  return { [field]: { $in: outletIdValues(resolved) } };
 }
 
 function text(value: unknown, fallback = "—"): string {
@@ -171,7 +211,7 @@ function mapTank(
   return {
     id,
     serialNumber: text(document.tank_serial_no),
-    retailOutletId: outletId(text(document.retail_outlet_id, DEFAULT_OUTLET_ID)),
+retailOutletId: outletId(text(document.retail_outlet_id, DEFAULT_OUTLET_ID)),
     probeStatus: latestReading?.atgProbeStatus ?? text(document.atgProbeStatus, "Unknown"),
     height: numberOrNull(document.height),
     width: numberOrNull(document.width),
@@ -183,16 +223,17 @@ function mapTank(
 }
 
 function mapStation(document: StationDocument): StationRecord {
+  const id = String(document.id ?? document._id);
   return {
-    id: stationId(String(document.id ?? document._id)),
-    name: text(document.name, "Unknown station"),
+    id: stationId(id),
+    name: text(document.name, text(document.location, `Station ${id}`)),
     stateOffice: document.state_office ?? "",
     divisionalOffice: document.divisional_office ?? "",
     salesArea: document.sales_area ?? "",
     dealerName: document.dealer_ro_name ?? "",
     location: document.location ?? "",
     pincode: document.pincode ?? "",
-    retailOutletId: outletId(text(document.retail_outlet_id, DEFAULT_OUTLET_ID)),
+    retailOutletId: stationOutletId(document),
     active: document.activeStatus === true || document.activeStatus === 1,
     sapCustCode: text(document.sap_cust_code ?? document.sapCustCode),
   };
@@ -240,10 +281,35 @@ async function loadTankTelemetry(
   input?: OutletId | string,
 ): Promise<TankTelemetry[]> {
   const database = await getMongoDatabase();
-  const filter: Filter<TankTelemetryDocument> = {
-    retail_outlet: { $in: outletIdValues(resolveOutletId(input)) },
-  };
+  const resolved = await resolveOutletId(input);
+  const outletValues = outletIdValues(resolved);
+
+  // Telemetry may carry a stale retail_outlet, so also match readings by the
+  // tank ids registered for the outlet.
+  const tankDocs = await database
+    .collection<TankDocument>("tanks")
+    .find(await outletFilter("retail_outlet_id", input))
+    .project({ id: 1, _id: 0 })
+    .toArray();
+  const tankIds = tankDocs
+    .map((document) => document.id)
+    .filter((value): value is string | number => value !== undefined && value !== null);
+
+  const conditions: Filter<TankTelemetryDocument>[] = [
+    { retail_outlet: { $in: outletValues } },
+  ];
+  if (tankIds.length > 0) {
+    // Tank ids repeat across stations, so readings without an outlet can only
+    // be attributed by tank id when the outlet is unknown.
+    conditions.push({
+      retail_outlet: { $exists: false },
+      tank_id: { $in: tankIds },
+    });
+  }
+
+  const filter: Filter<TankTelemetryDocument> = { $or: conditions };
   if (tankId !== undefined) filter.tank_id = tankId;
+
   const documents = await database
     .collection<TankTelemetryDocument>("tank_telemetry")
     .find(filter)
@@ -258,7 +324,7 @@ async function loadDispenserTelemetry(
   input?: OutletId | string,
 ): Promise<DispenserTransaction[]> {
   const database = await getMongoDatabase();
-  const resolved = resolveOutletId(input);
+  const resolved = await resolveOutletId(input);
   const outletValues = outletIdValues(resolved);
 
   const filter: Filter<DispenserTelemetryDocument> = {};
@@ -267,13 +333,12 @@ async function loadDispenserTelemetry(
     const serialValues = [serialNumber, Number(serialNumber)].filter(
       (value) => typeof value === "string" || Number.isFinite(value),
     );
+    // Telemetry documents may not carry a retail_outlet field, so the
+    // dispenser serial is the authoritative match for a specific dispenser.
     filter.$or = [
       { serial_no: { $in: serialValues } },
       { du_sr_no: { $in: serialValues } },
     ];
-    if (input !== undefined) {
-      filter.retail_outlet = { $in: outletValues };
-    }
   } else {
     // Match telemetry by outlet, and also by dispensers registered for the
     // outlet. Telemetry documents may not carry a retail_outlet field, so
@@ -284,7 +349,7 @@ async function loadDispenserTelemetry(
     }
     const dispenserDocs = await database
       .collection<DispenserDocument>("dispensers")
-      .find(outletFilter("retail_outlet_id", input))
+      .find(await outletFilter("retail_outlet_id", input))
       .project({ dispenser_serial_no: 1, id: 1, _id: 0 })
       .toArray();
     const serialValues = dispenserDocs
@@ -330,6 +395,44 @@ export async function listStations(): Promise<StationRecord[]> {
   return documents.map(mapStation);
 }
 
+/**
+ * Searches the stations collection by station id or by any of the descriptive
+ * fields that act as the station name (location, dealer, SAP code, offices).
+ */
+export async function searchStations(
+  query: string,
+  limit = 20,
+): Promise<StationRecord[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const database = await getMongoDatabase();
+  const numericId = Number(trimmed);
+  const idValues: Array<string | number> = [trimmed];
+  if (Number.isSafeInteger(numericId)) idValues.push(numericId);
+
+  const pattern = new RegExp(escapeRegExp(trimmed), "i");
+  const documents = await database
+    .collection<StationDocument>("stations")
+    .find({
+      $or: [
+        { id: { $in: idValues } },
+        { name: pattern },
+        { location: pattern },
+        { dealer_ro_name: pattern },
+        { sap_cust_code: pattern },
+        { state_office: pattern },
+        { divisional_office: pattern },
+        { sales_area: pattern },
+        { pincode: pattern },
+      ],
+    })
+    .limit(limit)
+    .toArray();
+
+  return documents.map(mapStation);
+}
+
 export async function getStationById(
   id: StationId | string,
 ): Promise<StationRecord | undefined> {
@@ -340,16 +443,22 @@ export async function getStationById(
   const document = await database
     .collection<StationDocument>("stations")
     .findOne({ id: { $in: idValues } });
-  return document ? mapStation(document) : undefined;
+  if (document) return mapStation(document);
+
+  // Fall back to retail_outlet_id so a station can be reached via its outlet ID.
+  return getStationByOutletId(id);
 }
 
 export async function getStationByOutletId(
   input: OutletId | string,
 ): Promise<StationRecord | undefined> {
   const database = await getMongoDatabase();
+  const values = outletIdValues(input);
   const document = await database
     .collection<StationDocument>("stations")
-    .findOne({ retail_outlet_id: { $in: outletIdValues(input) } });
+    .findOne({
+      $or: [{ retail_outlet_id: { $in: values } }, { id: { $in: values } }],
+    });
   return document ? mapStation(document) : undefined;
 }
 
@@ -361,14 +470,14 @@ export async function countStations(): Promise<number> {
 export async function countTanks(input?: OutletId | string): Promise<number> {
   const database = await getMongoDatabase();
   return database.collection<TankDocument>("tanks").countDocuments(
-    outletFilter("retail_outlet_id", input),
+    await outletFilter("retail_outlet_id", input),
   );
 }
 
 export async function countDispensers(input?: OutletId | string): Promise<number> {
   const database = await getMongoDatabase();
   return database.collection<DispenserDocument>("dispensers").countDocuments(
-    outletFilter("retail_outlet_id", input),
+    await outletFilter("retail_outlet_id", input),
   );
 }
 
@@ -382,7 +491,7 @@ export async function listTankReadings(
 ): Promise<TankTelemetry[]> {
   const database = await getMongoDatabase();
   const filter: Filter<TankTelemetryDocument> = {
-    retail_outlet: { $in: outletIdValues(resolveOutletId(input)) },
+    retail_outlet: { $in: outletIdValues(await resolveOutletId(input)) },
   };
   if (tankId !== undefined) filter.tank_id = tankId;
   const documents = await database
@@ -399,7 +508,7 @@ export async function listTanks(input?: OutletId | string): Promise<TankAsset[]>
   const [documents, readings] = await Promise.all([
     database
       .collection<TankDocument>("tanks")
-      .find(outletFilter("retail_outlet_id", input))
+      .find(await outletFilter("retail_outlet_id", input))
       .toArray(),
     loadTankTelemetry(undefined, input),
   ]);
@@ -435,7 +544,7 @@ export async function listDispensers(
   const [documents, transactions] = await Promise.all([
     database
       .collection<DispenserDocument>("dispensers")
-      .find(outletFilter("retail_outlet_id", input))
+      .find(await outletFilter("retail_outlet_id", input))
       .toArray(),
     loadDispenserTelemetry(undefined, input),
   ]);
@@ -450,7 +559,7 @@ export async function listDispensers(
     return {
       id: dispenserId(text(document.id, serialNumber)),
       serialNumber,
-      retailOutletId: outletId(text(document.retail_outlet_id, DEFAULT_OUTLET_ID)),
+retailOutletId: outletId(text(document.retail_outlet_id, DEFAULT_OUTLET_ID)),
       batchNumber: text(document.batch_no),
       customerType: text(document.cust_type),
       loggedUserId: text(document.logged_user_id),
@@ -524,27 +633,42 @@ export async function getStationOverview(
   now = new Date(),
 ): Promise<StationOverview> {
   const database = await getMongoDatabase();
-  const resolved = resolveOutletId(input);
+  const resolved = await resolveOutletId(input);
   const outletValues = outletIdValues(resolved);
 
-  const [stationDoc, tanks, tankTelemetry, dispensers] = await Promise.all([
+  const [stationDoc, tanks, dispensers] = await Promise.all([
     database.collection<StationDocument>("stations").findOne({
-      retail_outlet_id: { $in: outletValues },
+      $or: [
+        { retail_outlet_id: { $in: outletValues } },
+        { id: { $in: outletValues } },
+      ],
     }),
     database
       .collection<TankDocument>("tanks")
       .find({ retail_outlet_id: { $in: outletValues } })
       .toArray(),
     database
-      .collection<TankTelemetryDocument>("tank_telemetry")
-      .find({ retail_outlet: { $in: outletValues } })
-      .sort({ datetime: -1, dts: -1 })
-      .toArray(),
-    database
       .collection<DispenserDocument>("dispensers")
       .find({ retail_outlet_id: { $in: outletValues } })
       .toArray(),
   ]);
+
+  // Tank ids repeat across stations, so readings without an outlet can only be
+  // attributed by tank id when the outlet is unknown.
+  const tankIds = tanks
+    .map((tank) => tank.id)
+    .filter((value): value is string | number => value !== undefined && value !== null);
+
+  const tankTelemetry = await database
+    .collection<TankTelemetryDocument>("tank_telemetry")
+    .find({
+      $or: [
+        { retail_outlet: { $in: outletValues } },
+        { retail_outlet: { $exists: false }, tank_id: { $in: tankIds } },
+      ],
+    })
+    .sort({ datetime: -1, dts: -1 })
+    .toArray();
 
   const dispenserSerials = dispensers
     .flatMap((d) => [d.dispenser_serial_no, d.id])
@@ -651,19 +775,7 @@ export async function getStationOverview(
 
   return {
     station: stationDoc
-      ? {
-          id: stationId(String(stationDoc.id ?? stationDoc._id)),
-          name: text(stationDoc.name, "Unknown station"),
-          stateOffice: stationDoc.state_office ?? "",
-          divisionalOffice: stationDoc.divisional_office ?? "",
-          salesArea: stationDoc.sales_area ?? "",
-          dealerName: stationDoc.dealer_ro_name ?? "",
-          location: stationDoc.location ?? "",
-          pincode: stationDoc.pincode ?? "",
-          retailOutletId: outletId(text(stationDoc.retail_outlet_id, DEFAULT_OUTLET_ID)),
-          active: stationDoc.activeStatus === true || stationDoc.activeStatus === 1,
-          sapCustCode: text(stationDoc.sap_cust_code ?? stationDoc.sapCustCode),
-        }
+      ? mapStation(stationDoc)
       : {
           id: stationId(text(resolved)),
           name: "Unknown station",

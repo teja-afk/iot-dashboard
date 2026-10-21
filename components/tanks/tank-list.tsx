@@ -15,7 +15,6 @@ export default async function TankListPage() {
     href: `/tanks/${encodeURIComponent(tank.id)}`,
     status: tank.probeStatus,
     statusTone: tank.probeStatus.toLowerCase() === "active" ? "good" : "warning",
-    icon: "tank",
     visual: (
       <TankLevelGraphic
         id={tank.id}
@@ -40,6 +39,7 @@ export default async function TankListPage() {
       items={items}
       reportsHref="/tanks/reports"
       statusSummaryLabel="probes active"
+      columns={4}
     />
   );
 }

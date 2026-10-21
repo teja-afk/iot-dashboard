@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StationSelectButton } from "@/components/common/station-select-button";
 import { getStationById } from "@/lib/data";
+import type { StationOption } from "@/types";
 
 export default async function StationDetailPage({
   params,
@@ -13,6 +14,18 @@ export default async function StationDetailPage({
   const { stationId } = await params;
   const station = await getStationById(stationId);
   if (!station) notFound();
+
+  const option: StationOption = {
+    id: station.id,
+    name: station.name,
+    retailOutletId: station.retailOutletId,
+    location: station.location,
+    dealerName: station.dealerName,
+    salesArea: station.salesArea,
+    pincode: station.pincode,
+    stateOffice: station.stateOffice,
+    active: station.active,
+  };
 
   return (
     <main className="min-h-[calc(100vh-2.75rem)] bg-[#f6f8f7] p-5 sm:p-8">
@@ -75,7 +88,7 @@ export default async function StationDetailPage({
           <p className="mb-4 text-sm text-slate-500">
             Switch to this station and view its tank, dispenser, and nozzle data.
           </p>
-          <StationSelectButton station={station} />
+          <StationSelectButton station={option} />
         </div>
       </div>
     </main>

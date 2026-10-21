@@ -12,7 +12,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { StationSelector } from "@/components/common/station-selector";
 import { GlobalStationSearch } from "@/components/common/global-station-search";
 
 type BreadcrumbEntry = { label: string; href?: string };
@@ -52,11 +51,9 @@ function getBreadcrumbs(pathname: string): BreadcrumbEntry[] {
 }
 
 export function DashboardHeader({
-  stations,
-  currentOutletId,
+  currentStation,
 }: {
-  stations: { id: string; name: string; retailOutletId: string }[];
-  currentOutletId?: string;
+  currentStation?: { id: string; name: string; retailOutletId: string };
 }) {
   const pathname = usePathname();
   const breadcrumbs = getBreadcrumbs(pathname);
@@ -85,8 +82,15 @@ export function DashboardHeader({
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
-        <StationSelector stations={stations} currentOutletId={currentOutletId} />
-        <GlobalStationSearch stations={stations} />
+        {currentStation ? (
+          <span className="hidden max-w-[220px] truncate rounded-md border border-[#cde4dd] bg-[#e8f6f1] px-2 py-1 text-xs font-medium text-[#16806c] sm:inline-block">
+            {currentStation.name}
+            <span className="ms-1 font-mono text-[10px] text-[#4c8f7e]">
+              {currentStation.retailOutletId}
+            </span>
+          </span>
+        ) : null}
+        <GlobalStationSearch />
         <div className="inline-flex shrink-0 items-center font-mono text-sm font-semibold tabular-nums text-black">
           <Clock />
         </div>

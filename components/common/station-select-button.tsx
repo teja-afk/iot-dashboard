@@ -1,7 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { setSelectedOutletId } from "@/lib/station-actions";
+import { selectStation } from "@/lib/station-actions";
 import { Button } from "@/components/ui/button";
 import type { StationOption } from "@/types";
 
@@ -11,10 +12,12 @@ export function StationSelectButton({
   station: StationOption;
 }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleClick() {
-    startTransition(() => {
-      setSelectedOutletId(station.retailOutletId);
+    startTransition(async () => {
+      await selectStation(station.retailOutletId);
+      router.refresh();
     });
   }
 
