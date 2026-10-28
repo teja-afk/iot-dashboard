@@ -3,8 +3,10 @@ import { ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import type { NozzleSummary } from "@/types";
+import { getFuelColor } from "@/lib/fuel-colors";
 
 export function NozzleCard({ nozzle }: { nozzle: NozzleSummary }) {
+  const fuel = getFuelColor(nozzle.product);
   return (
     <Link
       href={`/nozzles/${encodeURIComponent(nozzle.id)}`}
@@ -12,19 +14,13 @@ export function NozzleCard({ nozzle }: { nozzle: NozzleSummary }) {
     >
       <Card className="gap-4 border-[#dce9e5] transition-shadow group-hover:shadow-md">
         <CardHeader className="grid-cols-[minmax(0,1fr)_auto] items-start">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f1] text-[#16806c]">
-              <span aria-hidden="true" className="size-5">🔧</span>
-            </span>
-            <div className="min-w-0">
-              <CardTitle className="truncate text-base text-[#17352f]">Nozzle {nozzle.nozzleNumber}</CardTitle>
-              <p className="mt-1 truncate font-mono text-xs text-slate-400">{nozzle.id}</p>
-            </div>
+          <div className="min-w-0">
+            <CardTitle className="truncate text-base text-[#17352f]">Nozzle {nozzle.nozzleNumber}</CardTitle>
+            <p className="mt-1 truncate font-mono text-xs text-slate-400">{nozzle.id}</p>
           </div>
-          <Badge className="bg-sky-50 text-sky-700">Observed</Badge>
-          <p className="col-span-2 text-sm text-slate-500">
-            Observed on dispenser {nozzle.dispenserSerial}
-          </p>
+          <Badge className={`${fuel.bg} ${fuel.text} border ${fuel.ring}`}>
+            {nozzle.product}
+          </Badge>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-2 gap-x-3 gap-y-4">

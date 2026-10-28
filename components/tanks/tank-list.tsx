@@ -11,7 +11,6 @@ export default async function TankListPage() {
   const items: OverviewItem[] = tanks.map((tank) => ({
     id: tank.id,
     name: tank.serialNumber === "—" ? `Tank ${tank.id}` : tank.serialNumber,
-    subtitle: `Retail outlet ${tank.retailOutletId} · ${tank.height ?? "—"} × ${tank.width ?? "—"} mm`,
     href: `/tanks/${encodeURIComponent(tank.id)}`,
     status: tank.probeStatus,
     statusTone: tank.probeStatus.toLowerCase() === "active" ? "good" : "warning",
@@ -20,6 +19,7 @@ export default async function TankListPage() {
         id={tank.id}
         fuelLevelLiters={tank.latestReading?.fuelLevelLiters ?? null}
         waterLevelLiters={tank.latestReading?.waterLevelLiters ?? null}
+        ullageLiters={tank.latestReading?.ullageLiters ?? null}
         size="compact"
       />
     ),

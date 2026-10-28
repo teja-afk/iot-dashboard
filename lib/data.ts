@@ -1,25 +1,45 @@
 import "server-only";
 
 import type { Document, Filter } from "mongodb";
+import {
+  differenceInCalendarDays,
+  endOfDay,
+  format,
+  isWithinInterval,
+  parseISO,
+  startOfDay,
+  startOfWeek,
+  subDays,
+  subMonths,
+  subYears,
+} from "date-fns";
 import { getMongoDatabase } from "@/lib/mongodb";
 import type {
   DispenserAsset,
   DispenserTransaction,
   NozzleSummary,
+  NozzleErrorLog,
+  NozzleCpuSpec,
+  AuthUser,
   OutletId,
   StationAlert,
+  StationAnalytics,
   StationId,
-  StationRecord,
   StationOverview,
+  StationRecord,
   TankAsset,
   TankId,
+  TankStatus,
   TankTelemetry,
+  DateRangePreset,
 } from "@/types";
 import { dispenserId, nozzleId, outletId, stationId, tankId } from "@/types";
 
 const DEFAULT_OUTLET_ID: OutletId = outletId(
   process.env.MONGODB_RETAIL_OUTLET_ID || "31483",
 );
+
+export { DEFAULT_OUTLET_ID };
 
 interface TankDocument extends Document {
   id?: string | number;
@@ -72,6 +92,44 @@ interface DispenserTelemetryDocument extends Document {
   dts?: string | Date;
   amount_totalizer?: string | number;
   volume_totalizer?: string | number;
+  product?: string;
+}
+
+interface ReadErrorLogDocument extends Document {
+  dts?: string | Date;
+  topic?: string;
+  type?: string;
+  serial_no?: string | number;
+  nza?: string | number;
+  dua?: string | number;
+  datetime?: string | Date;
+  errorcode?: string | number;
+  description?: string;
+  power_reset_required?: string;
+}
+
+interface ReadCpuSpecDocument extends Document {
+  dts?: string | Date;
+  topic?: string;
+  type?: string;
+  serial_no?: string | number;
+  nza?: string | number;
+  dua?: string | number;
+  datetime?: string | Date;
+  hardware_sr_no?: string;
+  software_version?: string;
+  wlmc_crc?: string;
+  code_crc?: string;
+}
+
+interface AuthUserDocument extends Document {
+  id?: string | number;
+  username?: string;
+  password?: string;
+  role?: string;
+  active?: boolean | number;
+  ef?: string | Date;
+  et?: string | Date;
 }
 
 interface StationDocument extends Document {
@@ -200,6 +258,46 @@ function mapTransaction(document: DispenserTelemetryDocument): DispenserTransact
     localId: text(document.local_id),
     amountTotalizer: text(document.amount_totalizer),
     volumeTotalizer: text(document.volume_totalizer),
+    product: text(document.product, "Unknown"),
+  };
+}
+
+function mapErrorLog(document: ReadErrorLogDocument): NozzleErrorLog {
+  const serial = text(document.serial_no, "Unknown dispenser");
+  const nozzle = text(document.nza, "Unknown nozzle");
+  const dua = text(document.dua, "Unknown dua");
+  const datetime = dateText(document.datetime ?? document.dts);
+  return {
+    id: `${serial}:${nozzle}:${datetime}:${document.errorcode ?? "error"}`,
+    datetime,
+    topic: text(document.topic),
+    type: text(document.type),
+    serialNo: serial,
+    nza: nozzle,
+    dua,
+    errorCode: text(document.errorcode),
+    description: text(document.description),
+    powerResetRequired: text(document.power_reset_required, "NO"),
+  };
+}
+
+function mapCpuSpec(document: ReadCpuSpecDocument): NozzleCpuSpec {
+  const serial = text(document.serial_no, "Unknown dispenser");
+  const nozzle = text(document.nza, "Unknown nozzle");
+  const dua = text(document.dua, "Unknown dua");
+  const datetime = dateText(document.datetime ?? document.dts);
+  return {
+    id: `${serial}:${nozzle}:${datetime}`,
+    datetime,
+    topic: text(document.topic),
+    type: text(document.type),
+    serialNo: serial,
+    nza: nozzle,
+    dua,
+    hardwareSrNo: text(document.hardware_sr_no),
+    softwareVersion: text(document.software_version),
+    wlmcCrc: text(document.wlmc_crc),
+    codeCrc: text(document.code_crc),
   };
 }
 
@@ -257,6 +355,7 @@ function summarizeNozzles(transactions: DispenserTransaction[]): NozzleSummary[]
         transactionCount: 0,
         totalAmount: 0,
         totalVolume: 0,
+        product: transaction.product,
       };
       summaries.set(id, summary);
     }
@@ -387,6 +486,128 @@ async function loadDispenserTelemetry(
   }
 
   return documents.map(mapTransaction);
+}
+
+async function loadErrorLogs(
+  serialNumber?: string,
+  nza?: string,
+  input?: OutletId | string,
+): Promise<NozzleErrorLog[]> {
+  const database = await getMongoDatabase();
+  const resolved = await resolveOutletId(input);
+  const outletValues = outletIdValues(resolved);
+
+  const conditions: Filter<ReadErrorLogDocument>[] = [];
+
+  if (serialNumber !== undefined) {
+    const serialValues = [serialNumber, Number(serialNumber)].filter(
+      (value) => typeof value === "string" || Number.isFinite(value),
+    );
+    const orConditions: Filter<ReadErrorLogDocument>[] = [
+      { serial_no: { $in: serialValues } },
+    ];
+    if (nza !== undefined) orConditions.push({ nza });
+    conditions.push({ $or: orConditions });
+  } else {
+    if (outletValues.length > 0) {
+      conditions.push({ retail_outlet: { $in: outletValues } });
+    }
+    const dispenserDocs = await database
+      .collection<DispenserDocument>("dispensers")
+      .find(await outletFilter("retail_outlet_id", input))
+      .project({ dispenser_serial_no: 1, id: 1, _id: 0 })
+      .toArray();
+    const outletSerialValues = dispenserDocs
+      .flatMap((d) => [d.dispenser_serial_no, d.id])
+      .filter((value) => typeof value === "string" || Number.isFinite(value));
+    if (outletSerialValues.length > 0) {
+      conditions.push({
+        $or: [{ serial_no: { $in: outletSerialValues } }, { du_sr_no: { $in: outletSerialValues } }],
+      });
+    }
+  }
+
+  const filter: Filter<ReadErrorLogDocument> =
+    conditions.length === 1 ? conditions[0] : { $and: conditions };
+
+  let documents = await database
+    .collection<ReadErrorLogDocument>("ReadErrorLog")
+    .find(filter)
+    .sort({ datetime: -1, dts: -1 })
+    .limit(MAX_TELEMETRY_RECORDS)
+    .toArray();
+
+  if (documents.length === 0) {
+    documents = await database
+      .collection<ReadErrorLogDocument>("read_error_log")
+      .find(filter)
+      .sort({ datetime: -1, dts: -1 })
+      .limit(MAX_TELEMETRY_RECORDS)
+      .toArray();
+  }
+
+  return documents.map(mapErrorLog);
+}
+
+async function loadCpuSpecs(
+  serialNumber?: string,
+  nza?: string,
+  input?: OutletId | string,
+): Promise<NozzleCpuSpec[]> {
+  const database = await getMongoDatabase();
+  const resolved = await resolveOutletId(input);
+  const outletValues = outletIdValues(resolved);
+
+  const conditions: Filter<ReadCpuSpecDocument>[] = [];
+
+  if (serialNumber !== undefined) {
+    const serialValues = [serialNumber, Number(serialNumber)].filter(
+      (value) => typeof value === "string" || Number.isFinite(value),
+    );
+    const orConditions: Filter<ReadCpuSpecDocument>[] = [
+      { serial_no: { $in: serialValues } },
+    ];
+    if (nza !== undefined) orConditions.push({ nza });
+    conditions.push({ $or: orConditions });
+  } else {
+    if (outletValues.length > 0) {
+      conditions.push({ retail_outlet: { $in: outletValues } });
+    }
+    const dispenserDocs = await database
+      .collection<DispenserDocument>("dispensers")
+      .find(await outletFilter("retail_outlet_id", input))
+      .project({ dispenser_serial_no: 1, id: 1, _id: 0 })
+      .toArray();
+    const outletSerialValues = dispenserDocs
+      .flatMap((d) => [d.dispenser_serial_no, d.id])
+      .filter((value) => typeof value === "string" || Number.isFinite(value));
+    if (outletSerialValues.length > 0) {
+      conditions.push({
+        $or: [{ serial_no: { $in: outletSerialValues } }, { du_sr_no: { $in: outletSerialValues } }],
+      });
+    }
+  }
+
+  const filter: Filter<ReadCpuSpecDocument> =
+    conditions.length === 1 ? conditions[0] : { $and: conditions };
+
+  let documents = await database
+    .collection<ReadCpuSpecDocument>("ReadCPUSpecificationWithNewSrNo")
+    .find(filter)
+    .sort({ datetime: -1, dts: -1 })
+    .limit(MAX_TELEMETRY_RECORDS)
+    .toArray();
+
+  if (documents.length === 0) {
+    documents = await database
+      .collection<ReadCpuSpecDocument>("read_cpu_specification_with_new_sr_no")
+      .find(filter)
+      .sort({ datetime: -1, dts: -1 })
+      .limit(MAX_TELEMETRY_RECORDS)
+      .toArray();
+  }
+
+  return documents.map(mapCpuSpec);
 }
 
 export async function listStations(): Promise<StationRecord[]> {
@@ -535,6 +756,22 @@ export async function listDispenserTransactions(
   input?: OutletId | string,
 ): Promise<DispenserTransaction[]> {
   return loadDispenserTelemetry(serialNumber, input);
+}
+
+export async function listErrorLogs(
+  serialNumber?: string,
+  nza?: string,
+  input?: OutletId | string,
+): Promise<NozzleErrorLog[]> {
+  return loadErrorLogs(serialNumber, nza, input);
+}
+
+export async function listCpuSpecs(
+  serialNumber?: string,
+  nza?: string,
+  input?: OutletId | string,
+): Promise<NozzleCpuSpec[]> {
+  return loadCpuSpecs(serialNumber, nza, input);
 }
 
 export async function listDispensers(
@@ -829,4 +1066,397 @@ function getTodayBounds(now: Date): { start: Date; end: Date } {
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
   return { start, end };
+}
+
+export async function getStationAnalytics(
+  input?: OutletId | string,
+  range: DateRangePreset = "1mnth",
+  start?: string,
+  end?: string,
+): Promise<StationAnalytics> {
+  const database = await getMongoDatabase();
+  const resolved = await resolveOutletId(input);
+  const outletValues = outletIdValues(resolved);
+
+  const now = new Date();
+  let rangeStart: Date;
+  let rangeEnd: Date = now;
+
+  if (range === "custom" && start && end) {
+    rangeStart = startOfDay(parseISO(start));
+    rangeEnd = endOfDay(parseISO(end));
+  } else if (range === "alltime") {
+    rangeStart = startOfDay(subYears(now, 50));
+  } else {
+    switch (range) {
+      case "24hr":
+        rangeStart = subDays(now, 1);
+        break;
+      case "15days":
+        rangeStart = subDays(now, 15);
+        break;
+      case "3mnth":
+        rangeStart = subMonths(now, 3);
+        break;
+      case "6mnth":
+        rangeStart = subMonths(now, 6);
+        break;
+      case "1yr":
+        rangeStart = subMonths(now, 12);
+        break;
+      default:
+        rangeStart = subMonths(now, 1);
+    }
+    rangeStart = startOfDay(rangeStart);
+  }
+
+  const [stationDoc, tanks, dispensers] = await Promise.all([
+    database.collection<StationDocument>("stations").findOne({
+      $or: [
+        { retail_outlet_id: { $in: outletValues } },
+        { id: { $in: outletValues } },
+      ],
+    }),
+    database
+      .collection<TankDocument>("tanks")
+      .find({ retail_outlet_id: { $in: outletValues } })
+      .toArray(),
+    database
+      .collection<DispenserDocument>("dispensers")
+      .find({ retail_outlet_id: { $in: outletValues } })
+      .toArray(),
+  ]);
+
+  const tankIds = tanks
+    .map((tank) => tank.id)
+    .filter((value): value is string | number => value !== undefined && value !== null);
+
+  const tankTelemetry = await database
+    .collection<TankTelemetryDocument>("tank_telemetry")
+    .find({
+      $or: [
+        { retail_outlet: { $in: outletValues } },
+        { retail_outlet: { $exists: false }, tank_id: { $in: tankIds } },
+      ],
+    })
+    .sort({ datetime: -1, dts: -1 })
+    .toArray();
+
+  const dispenserSerials = dispensers
+    .flatMap((d) => [d.dispenser_serial_no, d.id])
+    .filter((s): s is string => Boolean(s));
+
+  const telemetryFilter = dispenserSerials.length > 0
+    ? {
+        $or: [
+          { retail_outlet: { $in: outletValues } },
+          { serial_no: { $in: dispenserSerials } },
+          { du_sr_no: { $in: dispenserSerials } },
+        ],
+      }
+    : {
+        $or: [
+          { retail_outlet: { $in: outletValues } },
+          {},
+        ],
+      };
+
+  let dispenserTelemetry = await database
+    .collection<DispenserTelemetryDocument>("dispenser_telemetry")
+    .find(telemetryFilter)
+    .sort({ datetime: -1, dts: -1 })
+    .limit(5000)
+    .toArray();
+
+  if (dispenserTelemetry.length === 0) {
+    dispenserTelemetry = await database
+      .collection<DispenserTelemetryDocument>("dispensers_telemetry")
+      .find(telemetryFilter)
+      .sort({ datetime: -1, dts: -1 })
+      .limit(5000)
+      .toArray();
+  }
+
+  const latestTankTelemetry = new Map<string, TankTelemetryDocument>();
+  for (const reading of tankTelemetry) {
+    if (reading.tank_id && !latestTankTelemetry.has(String(reading.tank_id))) {
+      latestTankTelemetry.set(String(reading.tank_id), reading);
+    }
+  }
+
+  const rangeDays = Math.max(1, differenceInCalendarDays(rangeEnd, rangeStart) + 1);
+  const granularity = rangeDays <= 2 ? "hour" : rangeDays <= 90 ? "day" : "week";
+
+  function bucketKey(timestamp: Date): string {
+    if (granularity === "hour") return format(timestamp, "MMM d, h a");
+    if (granularity === "week") return format(startOfWeek(timestamp), "MMM d");
+    return format(timestamp, "MMM d");
+  }
+
+  const dailyMap = new Map<string, { date: string; timestamp: Date; transactions: number; volume: number; amount: number }>();
+  const hourlyMap = new Map<string, { hour: string; timestamp: Date; transactions: number; volume: number; amount: number }>();
+  const dispenserMap = new Map<string, { dispenserSerial: string; transactions: number; volume: number; amount: number }>();
+  const nozzleMap = new Map<string, { id: string; dispenserSerial: string; nozzleNumber: string; transactions: number; volume: number; amount: number }>();
+  let totalTransactions = 0;
+  let totalVolume = 0;
+  let totalAmount = 0;
+  const activeDispensers = new Set<string>();
+  const parsed: Array<{ record: DispenserTelemetryDocument; timestamp: Date }> = [];
+
+  for (const record of dispenserTelemetry) {
+    const timestamp = parseTimestamp(record.datetime ?? record.dts);
+    if (!timestamp || !isWithinInterval(timestamp, { start: rangeStart, end: rangeEnd })) continue;
+    parsed.push({ record, timestamp });
+
+    const volume = numberOrNull(record.volume) ?? 0;
+    const amount = numberOrNull(record.amount) ?? 0;
+    const key = bucketKey(timestamp);
+    const existing = dailyMap.get(key) || { date: key, timestamp, transactions: 0, volume: 0, amount: 0 };
+    existing.transactions += 1;
+    existing.volume += volume;
+    existing.amount += amount;
+    dailyMap.set(key, existing);
+
+    const hourKey = format(timestamp, "HH:00");
+    const hourExisting = hourlyMap.get(hourKey) || { hour: hourKey, timestamp, transactions: 0, volume: 0, amount: 0 };
+    hourExisting.transactions += 1;
+    hourExisting.volume += volume;
+    hourExisting.amount += amount;
+    hourlyMap.set(hourKey, hourExisting);
+
+    const serial = text(record.serial_no ?? record.du_sr_no, "Unknown dispenser");
+    const dispenser = dispenserMap.get(serial) || { dispenserSerial: serial, transactions: 0, volume: 0, amount: 0 };
+    dispenser.transactions += 1;
+    dispenser.volume += volume;
+    dispenser.amount += amount;
+    dispenserMap.set(serial, dispenser);
+
+    const nozzleKey = `${serial}:${text(record.nza, "Unknown nozzle")}`;
+    const nozzle = nozzleMap.get(nozzleKey) || { id: nozzleKey, dispenserSerial: serial, nozzleNumber: text(record.nza, "Unknown nozzle"), transactions: 0, volume: 0, amount: 0, product: text(record.product, "Unknown") };
+    nozzle.transactions += 1;
+    nozzle.volume += volume;
+    nozzle.amount += amount;
+    nozzleMap.set(nozzleKey, nozzle);
+
+    activeDispensers.add(serial);
+    totalTransactions += 1;
+    totalVolume += volume;
+    totalAmount += amount;
+  }
+
+  const daily = Array.from(dailyMap.values())
+    .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+    .map(({ date, transactions, volume, amount }) => ({ date, transactions, volume, amount }));
+
+  const hourly = Array.from(hourlyMap.values())
+    .sort((a, b) => a.hour.localeCompare(b.hour))
+    .map(({ hour, transactions, volume, amount }) => ({ hour, transactions, volume, amount }));
+
+  const dispensersList = Array.from(dispenserMap.values())
+    .sort((a, b) => b.volume - a.volume)
+    .slice(0, 8);
+
+  const nozzleList = Array.from(nozzleMap.values())
+    .sort((a, b) => b.volume - a.volume)
+    .slice(0, 10)
+    .map((n) => ({ ...n, averageTransaction: n.transactions === 0 ? 0 : n.amount / n.transactions }));
+
+  const recentTransactions = parsed
+    .slice()
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    .slice(0, 5)
+    .map(({ record }) => ({
+      dispenserSerial: text(record.serial_no ?? record.du_sr_no, "Unknown dispenser"),
+      nozzleNumber: text(record.nza, "Unknown nozzle"),
+      amount: numberOrNull(record.amount),
+      volume: numberOrNull(record.volume),
+      datetime: dateText(record.datetime ?? record.dts),
+      product: text(record.product, "Unknown"),
+    }));
+
+  const tanksReporting = tanks.filter((tank) => latestTankTelemetry.has(String(tank.id))).length;
+  const healthPercentage = tanks.length === 0 ? 0 : Math.round((tanksReporting / tanks.length) * 1000) / 10;
+
+  const tankStatuses: TankStatus[] = tanks.map((tank) => {
+    const tankId = String(tank.id);
+    const reading = latestTankTelemetry.get(tankId);
+    const probeStatus = reading?.atg_probe_status ?? tank.atgProbeStatus;
+    let status: TankStatus["status"] = "Reporting";
+    if (!reading) status = "No telemetry";
+    else if (probeStatus && probeStatus.toLowerCase() !== "active") status = "Probe inactive";
+    return {
+      tankId,
+      serialNumber: text(tank.tank_serial_no),
+      fuelLevel: numberOrNull(reading?.fuel_level_liters) ?? null,
+      waterLevel: numberOrNull(reading?.water_level_liters) ?? null,
+      ullage: numberOrNull(reading?.ullage_liters) ?? null,
+      status,
+    };
+  });
+
+  const alerts: StationAlert[] = [];
+  for (const tank of tanks) {
+    const tankId = String(tank.id);
+    if (!tankId) continue;
+    const reading = latestTankTelemetry.get(tankId);
+    const probeStatus = reading?.atg_probe_status ?? tank.atgProbeStatus;
+    if (!reading) {
+      alerts.push({ id: tankId as TankId, equipment: "Tank", issue: "No telemetry received" });
+    } else if (probeStatus && probeStatus.toLowerCase() !== "active") {
+      alerts.push({ id: tankId as TankId, equipment: "Tank", issue: `Probe ${probeStatus}` });
+    }
+  }
+
+  const averageTransaction = totalTransactions === 0 ? 0 : totalAmount / totalTransactions;
+
+  let comparison;
+  try {
+    const periodLength = rangeEnd.getTime() - rangeStart.getTime();
+    const prevEnd = new Date(rangeStart.getTime() - 1);
+    const prevStart = new Date(prevEnd.getTime() - periodLength);
+    let prevTx = 0, prevVol = 0, prevAmt = 0;
+    for (const record of dispenserTelemetry) {
+      const ts = parseTimestamp(record.datetime ?? record.dts);
+      if (!ts || ts < prevStart || ts > prevEnd) continue;
+      prevTx += 1;
+      prevVol += numberOrNull(record.volume) ?? 0;
+      prevAmt += numberOrNull(record.amount) ?? 0;
+    }
+    const prevAvg = prevTx === 0 ? 0 : prevAmt / prevTx;
+    const changePct = (cur: number, prev: number) => {
+      if (prev === 0) return cur === 0 ? "0%" : "+100%";
+      const p = ((cur - prev) / prev) * 100;
+      const sign = p >= 0 ? "+" : "";
+      return `${sign}${p.toFixed(1)}%`;
+    };
+    comparison = {
+      current: { transactions: totalTransactions, volume: totalVolume, amount: totalAmount, averageTransaction },
+      previous: { transactions: prevTx, volume: prevVol, amount: prevAmt, averageTransaction: prevAvg },
+      change: {
+        transactions: changePct(totalTransactions, prevTx),
+        volume: changePct(totalVolume, prevVol),
+        amount: changePct(totalAmount, prevAmt),
+        averageTransaction: changePct(averageTransaction, prevAvg),
+      },
+    };
+  } catch {
+    // ignore comparison errors
+  }
+
+  return {
+    station: stationDoc
+      ? mapStation(stationDoc)
+      : {
+          id: stationId(text(resolved)),
+          name: "Unknown station",
+          stateOffice: "",
+          divisionalOffice: "",
+          salesArea: "",
+          dealerName: "",
+          location: "",
+          pincode: "",
+          retailOutletId: outletId(resolved),
+          active: false,
+        },
+    dispensers: { registered: dispensers.length },
+    nozzles: { observed: observedNozzles(dispenserTelemetry) },
+    totals: {
+      transactions: totalTransactions,
+      volume: totalVolume,
+      amount: totalAmount,
+      averageTransaction,
+    },
+    daily,
+    hourly,
+    dispenserMetrics: dispensersList,
+    nozzleMetrics: nozzleList,
+    tanks: tankStatuses,
+    health: {
+      percentage: healthPercentage,
+      tanksReporting,
+      totalTanks: tanks.length,
+    },
+    activeDispensers: activeDispensers.size,
+    alerts,
+    recentTransactions,
+    comparison,
+    operational: tanks.length > 0 && tanksReporting === tanks.length && alerts.length === 0,
+  };
+}
+
+function observedNozzles(records: DispenserTelemetryDocument[]): number {
+  const observed = new Set(
+    records.flatMap((record) => {
+      const serial = record.serial_no ?? record.du_sr_no;
+      return serial != null && record.nza != null ? [`${serial}:${record.nza}`] : [];
+    }),
+  );
+  return observed.size;
+}
+
+// ---------------------------------------------------------------------------
+// Authentication users
+// ---------------------------------------------------------------------------
+
+import { createHash } from "node:crypto";
+
+function hashPassword(password: string): string {
+  return createHash("md5").update(password).digest("hex");
+}
+
+function mapAuthUser(document: AuthUserDocument): AuthUser {
+  return {
+    id: String(document.id ?? document._id),
+    username: text(document.username, "user"),
+    role: (document.role as AuthUser["role"]) ?? "operator",
+    active: document.active !== false && document.active !== 0,
+  };
+}
+
+export async function getAuthUserById(
+  id: string,
+): Promise<AuthUser | undefined> {
+  const database = await getMongoDatabase();
+  const document = await database
+    .collection<AuthUserDocument>("auth_users")
+    .findOne({ id: id });
+  if (!document) return undefined;
+  return mapAuthUser(document);
+}
+
+export async function verifyAuthUser(
+  username: string,
+  password: string,
+): Promise<AuthUser | undefined> {
+  const database = await getMongoDatabase();
+  const document = await database
+    .collection<AuthUserDocument>("auth_users")
+    .findOne({ username: username });
+  if (!document) return undefined;
+  if (document.active === false || document.active === 0) return undefined;
+  const stored = text(document.password);
+  const provided = hashPassword(password);
+  if (stored !== provided) return undefined;
+  return mapAuthUser(document);
+}
+
+export async function createAuthUser(input: {
+  id: string;
+  username: string;
+  password: string;
+  role?: AuthUser["role"];
+  active?: boolean;
+}): Promise<AuthUser> {
+  const document: AuthUserDocument = {
+    id: input.id,
+    username: input.username,
+    password: hashPassword(input.password),
+    role: input.role ?? "operator",
+    active: input.active ?? true,
+    ef: new Date(),
+    et: new Date(),
+  };
+  const database = await getMongoDatabase();
+  await database.collection<AuthUserDocument>("auth_users").insertOne(document);
+  return mapAuthUser(document);
 }

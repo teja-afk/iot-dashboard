@@ -153,7 +153,7 @@ export function Field({
   );
 }
 
-export interface CheckboxProps extends React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root> {}
+export type CheckboxProps = React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>;
 
 export const Checkbox = React.forwardRef<React.ElementRef<typeof CheckboxPrimitive.Root>, CheckboxProps>(
   function Checkbox({ className, ...props }, ref) {
@@ -244,7 +244,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
   );
 });
 
-export interface PasswordInputProps extends Omit<InputProps, "type" | "trailing"> {}
+export type PasswordInputProps = Omit<InputProps, "type" | "trailing">;
 
 export const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(function PasswordInput(props, ref) {
   const [shown, setShown] = React.useState(false);
@@ -771,7 +771,7 @@ export type ColumnDef<TData, TValue = unknown> = {
 
 export interface DataTableProps<T extends object> {
   data: T[];
-  columns: ColumnDef<T, any>[];
+  columns: ColumnDef<T, unknown>[];
   searchPlaceholder?: string;
   selectable?: boolean;
   bulkActions?: (rows: T[]) => React.ReactNode;
@@ -810,9 +810,39 @@ export function DataTable<T extends object>({
   const [columnVisibility, setColumnVisibility] = React.useState<Record<string, boolean>>({});
   const [pageIndex, setPageIndex] = React.useState(0);
 
-  const headerColumns = React.useMemo<ColumnDef<T, any>[]>(() => {
+  const getRowKey = React.useCallback((row: T, index: number) => getRowId?.(row, index) ?? String(index), [getRowId]);
+
+  const visibleRows = React.useMemo(() => {
+    const rows = data.map((row, index) => {
+      const id = getRowKey(row, index);
+      return { id, row, index };
+    });
+
+    if (!globalFilter.trim()) {
+      return rows;
+    }
+
+    const query = globalFilter.trim().toLowerCase();
+    return rows.filter(({ row }) => {
+      return Object.values(row as Record<string, unknown>).some((value) => {
+        if (value == null) return false;
+        if (typeof value === "string" || typeof value === "number") {
+          return String(value).toLowerCase().includes(query);
+        }
+        if (Array.isArray(value)) {
+          return value.some((item) => String(item).toLowerCase().includes(query));
+        }
+        if (typeof value === "object") {
+          return JSON.stringify(value).toLowerCase().includes(query);
+        }
+        return false;
+      });
+    });
+  }, [data, getRowKey, globalFilter]);
+
+  const headerColumns = React.useMemo<ColumnDef<T, unknown>[]>(() => {
     if (!selectable) return userColumns;
-    const selectColumn: ColumnDef<T, any> = {
+    const selectColumn: ColumnDef<T, unknown> = {
       id: "__select",
       enableHiding: false,
       enableSorting: false,
@@ -849,15 +879,15 @@ export function DataTable<T extends object>({
       ),
     };
     return [selectColumn, ...userColumns];
-  }, [pageIndex, pageSize, rowSelection, selectable, userColumns]);
+  }, [pageIndex, pageSize, rowSelection, selectable, userColumns, visibleRows]);
 
-  const getColumnId = React.useCallback((column: ColumnDef<T, any>, index: number) => {
+  const getColumnId = React.useCallback((column: ColumnDef<T, unknown>, index: number) => {
     if (column.id) return column.id;
     if (typeof column.accessorKey === "string") return column.accessorKey;
     return `column-${index}`;
   }, []);
 
-  const valueForRow = React.useCallback((row: T, column: ColumnDef<T, any>) => {
+  const valueForRow = React.useCallback((row: T, column: ColumnDef<T, unknown>) => {
     if (typeof column.accessorFn === "function") {
       return column.accessorFn(row);
     }
@@ -873,36 +903,6 @@ export function DataTable<T extends object>({
       return columnVisibility[id] !== false;
     });
   }, [columnVisibility, getColumnId, headerColumns]);
-
-  const getRowKey = React.useCallback((row: T, index: number) => getRowId?.(row, index) ?? String(index), [getRowId]);
-
-  const visibleRows = React.useMemo(() => {
-    const rows = data.map((row, index) => {
-      const id = getRowKey(row, index);
-      return { id, row, index };
-    });
-
-    if (!globalFilter.trim()) {
-      return rows;
-    }
-
-    const query = globalFilter.trim().toLowerCase();
-    return rows.filter(({ row }) => {
-      return Object.values(row as Record<string, unknown>).some((value) => {
-        if (value == null) return false;
-        if (typeof value === "string" || typeof value === "number") {
-          return String(value).toLowerCase().includes(query);
-        }
-        if (Array.isArray(value)) {
-          return value.some((item) => String(item).toLowerCase().includes(query));
-        }
-        if (typeof value === "object") {
-          return JSON.stringify(value).toLowerCase().includes(query);
-        }
-        return false;
-      });
-    });
-  }, [data, getRowKey, globalFilter]);
 
   const sortedRows = React.useMemo(() => {
     if (!sortState.length) return visibleRows;
@@ -933,11 +933,9 @@ export function DataTable<T extends object>({
 
   const pageCount = Math.max(1, Math.ceil(sortedRows.length / Math.max(pageSize, 1)));
   const safePageIndex = Math.min(pageIndex, pageCount - 1);
-  React.useEffect(() => {
-    if (pageIndex !== safePageIndex) {
-      setPageIndex(safePageIndex);
-    }
-  }, [pageIndex, safePageIndex]);
+  if (pageIndex !== safePageIndex) {
+    setPageIndex(safePageIndex);
+  }
 
   const paginatedRows = sortedRows.slice(safePageIndex * pageSize, (safePageIndex + 1) * pageSize);
   const selectedRows = data.filter((row, index) => {
@@ -1064,7 +1062,7 @@ export function DataTable<T extends object>({
                           align === "right" && "flex-row-reverse",
                         )}
                       >
-                        {typeof column.header === "string" || typeof column.header === "number" ? column.header : (column.header as any)?.({ column: { id } }) ?? id}
+                        {typeof column.header === "string" || typeof column.header === "number" ? column.header : typeof column.header === "function" ? (column.header as (context: { column: { id: string } }) => React.ReactNode)({ column: { id } }) : id}
                         {isSorted ? (
                           isSorted.desc ? <ArrowDown className="size-3.5" aria-hidden /> : <ArrowUp className="size-3.5" aria-hidden />
                         ) : (
@@ -1072,7 +1070,7 @@ export function DataTable<T extends object>({
                         )}
                       </button>
                     ) : (
-                      typeof column.header === "string" || typeof column.header === "number" ? column.header : (column.header as any)?.({ column: { id } }) ?? id
+                      typeof column.header === "string" || typeof column.header === "number" ? column.header : typeof column.header === "function" ? (column.header as (context: { column: { id: string } }) => React.ReactNode)({ column: { id } }) : id
                     )}
                   </th>
                 );
@@ -1115,11 +1113,11 @@ export function DataTable<T extends object>({
                     const align = column.meta?.align ?? "left";
                     const cell = column.cell;
                     const value = valueForRow(row, column);
-                    const content = cell ? cell({ row: { id: id, original: row, index }, getValue: (key) => {
+                    const content = (cell ? cell({ row: { id: id, original: row, index }, getValue: <V = unknown>(key?: keyof T | string): V => {
                       const resolved = String(key ?? column.accessorKey ?? "");
-                      if (typeof column.accessorKey === "string" && resolved === column.accessorKey) return value as any;
-                      return (row as Record<string, unknown>)[resolved] as any;
-                    }, value }) : value;
+                      if (typeof column.accessorKey === "string" && resolved === column.accessorKey) return value as V;
+                      return (row as Record<string, unknown>)[resolved] as V;
+                    }, value }) : value) as React.ReactNode;
                     return (
                       <td
                         key={`${id}-${columnId}`}

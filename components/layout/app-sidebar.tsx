@@ -16,11 +16,6 @@ import {
 import { GalleryVerticalEndIcon, LayoutDashboardIcon, DatabaseIcon, FuelIcon, CableIcon } from "lucide-react";
 
 const data = {
-  user: {
-    name: "Service Engineer",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   navMain: [
     {
       title: "Station Overview",
@@ -51,12 +46,14 @@ export function AppSidebar({
   tankCount,
   dispenserCount,
   nozzleCount,
+  user,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   stationCount: number;
   tankCount: number;
   dispenserCount: number;
   nozzleCount: number;
+  user?: { name: string; email: string; avatar: string };
 }) {
   const { state } = useSidebar();
 
@@ -81,7 +78,7 @@ export function AppSidebar({
         />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={user ?? { name: "Service Engineer", email: "m@example.com", avatar: "/avatars/shadcn.jpg" }} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

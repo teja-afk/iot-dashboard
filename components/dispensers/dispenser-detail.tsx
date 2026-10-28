@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDispenserBySerial, listNozzlesByDispenserId, listDispenserTransactions } from "@/lib/data";
 import { getSelectedOutletId } from "@/lib/station-cookie";
+import { getFuelColor } from "@/lib/fuel-colors";
 
 function formatNumber(value: number, unit = ""): string {
   return `${value.toLocaleString()}${unit}`;
@@ -35,6 +36,7 @@ export default async function DispenserDetailPage({
       { label: "Volume", value: formatNumber(nozzle.totalVolume, " L") },
       { label: "Amount", value: formatNumber(nozzle.totalAmount) },
     ],
+    product: nozzle.product,
   }));
 
   const recentEvents = activity.slice(0, 8).map((transaction) => ({
@@ -43,6 +45,7 @@ export default async function DispenserDetailPage({
     description: `Volume ${formatNumber(transaction.volume ?? 0, " L")} · amount ${formatNumber(transaction.amount ?? 0)} · receipt ${transaction.receiptNumber}`,
     time: transaction.datetime,
     kind: "info" as const,
+    product: transaction.product,
   }));
 
   return (
@@ -97,47 +100,84 @@ export default async function DispenserDetailPage({
           </Card>
         </section>
 
+        {/* Observed nozzles in horizontal row-wise layout */}
+        <Card className="gap-0 border-[#dce9e5] py-0">
+          <CardHeader className="border-b border-[#edf3f0] py-4">
+            <CardTitle className="text-base text-[#17352f]">Observed nozzles · {nozzles.length}</CardTitle>
+            <CardDescription>
+              Nozzle numbers are derived from telemetry records for this dispenser serial.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="py-5">
+            {nozzleItems.length ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {nozzleItems.map((item) => {
+  const itemFuel = getFuelColor(item.product);
+  return (
+    <article
+      key={item.id}
+      className="flex flex-col justify-between rounded-xl border border-[#dce9e5] bg-white p-4 shadow-sm transition-all hover:border-[#16806c]/40 hover:shadow-md"
+    >
+      <div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <Link
+              href={item.href}
+              className="block truncate font-semibold text-sm text-[#17352f] hover:text-[#16806c]"
+            >
+              {item.name}
+            </Link>
+            <p className="truncate font-mono text-[11px] text-slate-400">{item.id}</p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <Badge className="bg-sky-50 text-[10px] text-sky-700 shrink-0">
+              {item.status}
+            </Badge>
+            {item.product ? (
+              <Badge className={`${itemFuel.bg} ${itemFuel.text} border ${itemFuel.ring} text-[10px] inline-flex items-center gap-1`}>
+                <span className={`size-1.5 rounded-full ${itemFuel.dot}`} aria-hidden="true" />
+                {item.product}
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-slate-500 line-clamp-2">{item.description}</p>
+      </div>
+
+      <div className="mt-4 border-t border-[#edf3f0] pt-3">
+        <div className="grid grid-cols-3 gap-2">
+          {item.metrics.map((metric) => (
+            <div key={metric.label} className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wide text-slate-400 truncate">
+                {metric.label}
+              </p>
+              <p className="mt-0.5 text-xs font-semibold text-[#17352f] truncate">
+                {metric.value}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center justify-end border-t border-[#edf3f0]/60 pt-2.5">
+          <Link
+            href={item.href}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-[#16806c] hover:underline"
+          >
+            View details <ArrowUpRight aria-hidden="true" className="size-3.5" />
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+})}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">No nozzle numbers have been observed in telemetry for this dispenser.</p>
+            )}
+          </CardContent>
+        </Card>
+
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-6">
-            <Card className="gap-0 border-[#dce9e5] py-0">
-              <CardHeader className="border-b border-[#edf3f0] py-4">
-                <CardTitle className="text-base text-[#17352f]">Observed nozzles · {nozzles.length}</CardTitle>
-                <CardDescription>
-                  Nozzle numbers are derived from telemetry records for this dispenser serial.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="py-5">
-                <div className="divide-y divide-[#edf3f0]">
-                  {nozzleItems.length ? (
-                    nozzleItems.map((item) => (
-                      <article key={item.id} className="grid gap-4 py-4 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Link href={item.href} className="font-semibold text-[#17352f] hover:text-[#16806c]">{item.name}</Link>
-                            <Badge className="bg-sky-50 text-sky-700">{item.status}</Badge>
-                          </div>
-                          <p className="mt-1 font-mono text-xs text-slate-400">{item.id}</p>
-                          <p className="mt-1 text-sm text-slate-500">{item.description}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-x-6 gap-y-2">
-                          {item.metrics.map((metric) => (
-                            <div key={metric.label}>
-                              <p className="text-[10px] uppercase tracking-wide text-slate-400">{metric.label}</p>
-                              <p className="mt-1 text-xs font-medium text-[#17352f]">{metric.value}</p>
-                            </div>
-                          ))}
-                          <Link href={item.href} aria-label={`View ${item.name} details`} className="self-center rounded-md p-2 text-[#16806c] hover:bg-[#e8f6f1]">
-                            <ArrowUpRight aria-hidden="true" className="size-4" />
-                          </Link>
-                        </div>
-                      </article>
-                    ))
-                  ) : (
-                    <p className="text-sm text-slate-500">No nozzle numbers have been observed in telemetry for this dispenser.</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
             {recentEvents.length > 0 ? (
               <Card className="gap-0 border-[#dce9e5] py-0">
                 <CardHeader className="border-b border-[#edf3f0] py-4">
@@ -146,20 +186,25 @@ export default async function DispenserDetailPage({
                 </CardHeader>
                 <CardContent className="py-5">
                   <ol className="space-y-5">
-                    {recentEvents.map((event) => (
-                      <li key={event.id} className="flex gap-3">
-                        <span className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden="true">
-                          ✓
-                        </span>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                            <p className="text-sm font-medium text-[#17352f]">{event.title}</p>
-                            <time className="text-xs text-slate-400">{event.time}</time>
+                    {recentEvents.map((event) => {
+                      const evFuel = getFuelColor(event.product);
+                      return (
+                        <li key={event.id} className="flex gap-3">
+                          <span className="mt-0.5 size-4 shrink-0 rounded-full bg-emerald-600" aria-hidden="true" />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                              <p className="text-sm font-medium text-[#17352f]">{event.title}</p>
+                              <time className="text-xs text-slate-400">{event.time}</time>
+                            </div>
+                            <p className="mt-1 text-sm text-slate-500">{event.description}</p>
+                            <span className={`mt-1.5 inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${evFuel.bg} ${evFuel.text}`}>
+                              <span className={`size-2 rounded-full ${evFuel.dot}`} aria-hidden="true" />
+                              {event.product}
+                            </span>
                           </div>
-                          <p className="mt-1 text-sm text-slate-500">{event.description}</p>
-                        </div>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ol>
                 </CardContent>
               </Card>

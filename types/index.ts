@@ -63,6 +63,7 @@ export type DispenserTransaction = {
   localId: string;
   amountTotalizer: string;
   volumeTotalizer: string;
+  product: string;
 };
 
 export type NozzleSummary = {
@@ -72,7 +73,35 @@ export type NozzleSummary = {
   transactionCount: number;
   totalAmount: number;
   totalVolume: number;
+  product: string;
   latestTransaction?: DispenserTransaction;
+};
+
+export type NozzleErrorLog = {
+  id: string;
+  datetime: string;
+  topic: string;
+  type: string;
+  serialNo: string;
+  nza: string;
+  dua: string;
+  errorCode: string;
+  description: string;
+  powerResetRequired: string;
+};
+
+export type NozzleCpuSpec = {
+  id: string;
+  datetime: string;
+  topic: string;
+  type: string;
+  serialNo: string;
+  nza: string;
+  dua: string;
+  hardwareSrNo: string;
+  softwareVersion: string;
+  wlmcCrc: string;
+  codeCrc: string;
 };
 
 export type DispenserAsset = {
@@ -139,6 +168,108 @@ export type StationOverview = {
   operational: boolean;
 };
 
+export type DailyMetric = {
+  date: string;
+  transactions: number;
+  volume: number;
+  amount: number;
+};
+
+export type DispenserMetric = {
+  dispenserSerial: string;
+  transactions: number;
+  volume: number;
+  amount: number;
+};
+
+export type TankStatus = {
+  tankId: string;
+  serialNumber: string;
+  fuelLevel: number | null;
+  waterLevel: number | null;
+  ullage: number | null;
+  status: "Reporting" | "No telemetry" | "Probe inactive";
+};
+
+export type HourlyMetric = {
+  hour: string;
+  transactions: number;
+  volume: number;
+  amount: number;
+};
+
+export type NozzleMetric = {
+  id: string;
+  dispenserSerial: string;
+  nozzleNumber: string;
+  transactions: number;
+  volume: number;
+  amount: number;
+  averageTransaction: number;
+  product?: string;
+};
+
+export type PeriodComparison = {
+  current: {
+    transactions: number;
+    volume: number;
+    amount: number;
+    averageTransaction: number;
+  };
+  previous: {
+    transactions: number;
+    volume: number;
+    amount: number;
+    averageTransaction: number;
+  };
+  change: {
+    transactions: string;
+    volume: string;
+    amount: string;
+    averageTransaction: string;
+  };
+};
+
+export type StationAnalytics = {
+  station: StationRecord;
+  nozzles: { observed: number };
+  totals: {
+    transactions: number;
+    volume: number;
+    amount: number;
+    averageTransaction: number;
+  };
+  daily: DailyMetric[];
+  hourly?: HourlyMetric[];
+  dispensers: { registered: number };
+  dispenserMetrics: DispenserMetric[];
+  nozzleMetrics?: NozzleMetric[];
+  tanks: TankStatus[];
+  health: { percentage: number; tanksReporting: number; totalTanks: number };
+  activeDispensers: number;
+  alerts: StationAlert[];
+  operational: boolean;
+  recentTransactions: Array<{
+    dispenserSerial: string;
+    nozzleNumber: string;
+    amount: number | null;
+    volume: number | null;
+    datetime: string;
+    product: string;
+  }>;
+  comparison?: PeriodComparison;
+};
+
+export type DateRangePreset =
+  | "24hr"
+  | "15days"
+  | "1mnth"
+  | "3mnth"
+  | "6mnth"
+  | "1yr"
+  | "alltime"
+  | "custom";
+
 export type StationOption = {
   id: string;
   name: string;
@@ -176,12 +307,13 @@ export type ChildAsset = {
   statusTone: "good" | "warning" | "critical" | "info";
   description: string;
   metrics: { label: string; value: string }[];
+  product?: string;
 };
 
 export type OverviewItem = {
   id: string;
   name: string;
-  subtitle: string;
+  subtitle?: string;
   href: string;
   status: string;
   statusTone: "good" | "warning" | "critical" | "info";
@@ -204,4 +336,11 @@ export type AuthService = {
   }>;
   getSession(): Promise<{ id: string; mobile: string } | null>;
   signOut(): Promise<void>;
+};
+
+export type AuthUser = {
+  id: string;
+  username: string;
+  role: "operator" | "manager" | "admin";
+  active: boolean;
 };

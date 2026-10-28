@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, AlertTriangle, Cpu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getNozzleById, listDispenserTransactions } from "@/lib/data";
+import { getNozzleById, listDispenserTransactions, listErrorLogs, listCpuSpecs } from "@/lib/data";
 import { getSelectedOutletId } from "@/lib/station-cookie";
+import { getFuelColor } from "@/lib/fuel-colors";
 
 function formatNumber(value: number, unit = ""): string {
   return `${value.toLocaleString()}${unit}`;
@@ -19,17 +20,26 @@ export default async function NozzleDetailPage({
   const nozzle = await getNozzleById(nozzleId, outletId);
   if (!nozzle) return null;
 
-  const transactions = (await listDispenserTransactions(nozzle.dispenserSerial, outletId)).filter(
+  const [transactions, errorLogs, cpuSpecs] = await Promise.all([
+    listDispenserTransactions(nozzle.dispenserSerial, outletId),
+    listErrorLogs(nozzle.dispenserSerial, nozzle.nozzleNumber, outletId),
+    listCpuSpecs(nozzle.dispenserSerial, nozzle.nozzleNumber, outletId),
+  ]);
+
+  const filteredTransactions = transactions.filter(
     (transaction) => transaction.nozzleNumber === nozzle.nozzleNumber,
   );
 
-  const events = transactions.slice(0, 10).map((transaction) => ({
+  const events = filteredTransactions.slice(0, 10).map((transaction) => ({
     id: transaction.id,
     title: `Telemetry record · ${transaction.receiptNumber}`,
     description: `Volume ${formatNumber(transaction.volume ?? 0, " L")} · amount ${formatNumber(transaction.amount ?? 0)} · unit price ${formatNumber(transaction.unitPrice ?? 0)}`,
     time: transaction.datetime,
+    product: transaction.product,
     kind: "info" as const,
   }));
+
+  const fuel = getFuelColor(nozzle.product);
 
   return (
     <main className="min-h-[calc(100vh-2.75rem)] bg-[#f6f8f7] p-5 sm:p-8">
@@ -41,7 +51,9 @@ export default async function NozzleDetailPage({
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-semibold tracking-tight text-[#17352f]">Nozzle {nozzle.nozzleNumber}</h1>
-              <Badge className="bg-sky-50 text-sky-700">Observed</Badge>
+              <Badge className={`${fuel.bg} ${fuel.text} border ${fuel.ring}`}>
+                {nozzle.product}
+              </Badge>
             </div>
             <p className="mt-2 font-mono text-sm text-slate-400">{nozzle.id}</p>
             <p className="mt-2 text-sm text-slate-500">
@@ -91,20 +103,25 @@ export default async function NozzleDetailPage({
                 </CardHeader>
                 <CardContent className="py-5">
                   <ol className="space-y-5">
-                    {events.map((event) => (
-                      <li key={event.id} className="flex gap-3">
-                        <span className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden="true">
-                          ✓
-                        </span>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                            <p className="text-sm font-medium text-[#17352f]">{event.title}</p>
-                            <time className="text-xs text-slate-400">{event.time}</time>
+                    {events.map((event) => {
+                      const evFuel = getFuelColor(event.product);
+                      return (
+                        <li key={event.id} className="flex gap-3">
+                          <span className="mt-0.5 size-4 shrink-0 rounded-full bg-emerald-600" aria-hidden="true" />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                              <p className="text-sm font-medium text-[#17352f]">{event.title}</p>
+                              <time className="text-xs text-slate-400">{event.time}</time>
+                            </div>
+                            <p className="mt-1 text-sm text-slate-500">{event.description}</p>
+                            <span className={`mt-1.5 inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${evFuel.bg} ${evFuel.text}`}>
+                              <span className={`size-2 rounded-full ${evFuel.dot}`} aria-hidden="true" />
+                              {event.product}
+                            </span>
                           </div>
-                          <p className="mt-1 text-sm text-slate-500">{event.description}</p>
-                        </div>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ol>
                 </CardContent>
               </Card>
@@ -161,6 +178,76 @@ export default async function NozzleDetailPage({
                 >
                   Open nozzle reports <ArrowUpRight aria-hidden="true" className="size-4" />
                 </Link>
+              </CardContent>
+            </Card>
+            <Card className="gap-0 border-[#dce9e5] py-0">
+              <CardHeader className="border-b border-[#edf3f0] py-4">
+                <CardTitle className="text-base text-[#17352f]">Error logs</CardTitle>
+                <CardDescription>ReadErrorLog records for this dispenser and nozzle.</CardDescription>
+              </CardHeader>
+              <CardContent className="py-5">
+                {errorLogs.length === 0 ? (
+                  <p className="text-sm text-slate-500">No error logs recorded for this nozzle.</p>
+                ) : (
+                  <ul className="space-y-4">
+                    {errorLogs.slice(0, 5).map((log) => (
+                      <li key={log.id} className="flex gap-3">
+                        <span className="mt-0.5 size-4 shrink-0 rounded-full bg-rose-500" aria-hidden="true" />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                            <p className="text-sm font-medium text-[#17352f]">
+                              Error {log.errorCode} · {log.description}
+                            </p>
+                            <time className="text-xs text-slate-400">{log.datetime}</time>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Topic {log.topic} · DUA {log.dua}
+                            {log.powerResetRequired === "YES" ? " · power reset required" : ""}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="gap-0 border-[#dce9e5] py-0">
+              <CardHeader className="border-b border-[#edf3f0] py-4">
+                <CardTitle className="flex items-center gap-2 text-base text-[#17352f]">
+                  <Cpu aria-hidden="true" className="size-4" /> CPU specification
+                </CardTitle>
+                <CardDescription>ReadCPUSpecificationWithNewSrNo records for this dispenser and nozzle.</CardDescription>
+              </CardHeader>
+              <CardContent className="py-5">
+                {cpuSpecs.length === 0 ? (
+                  <p className="text-sm text-slate-500">No CPU specifications recorded for this nozzle.</p>
+                ) : (
+                  <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                    {cpuSpecs.slice(0, 3).map((spec) => (
+                      <div key={spec.id} className="min-w-0 sm:col-span-2">
+                        <p className="text-xs font-medium text-slate-500">{spec.datetime}</p>
+                        <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wide text-slate-400">Hardware S/N</dt>
+                            <dd className="mt-0.5 font-medium text-[#17352f]">{spec.hardwareSrNo}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wide text-slate-400">Software</dt>
+                            <dd className="mt-0.5 font-medium text-[#17352f]">{spec.softwareVersion}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wide text-slate-400">WLMC CRC</dt>
+                            <dd className="mt-0.5 font-medium text-[#17352f]">{spec.wlmcCrc}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wide text-slate-400">Code CRC</dt>
+                            <dd className="mt-0.5 font-medium text-[#17352f]">{spec.codeCrc}</dd>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </dl>
+                )}
               </CardContent>
             </Card>
           </div>

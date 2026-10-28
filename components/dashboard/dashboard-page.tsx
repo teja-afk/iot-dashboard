@@ -3,15 +3,30 @@
 import Link from "next/link";
 import {
   ArrowUpRight,
-  Calendar,
-  ChevronDown,
-  LayoutDashboard,
-  Fuel,
-  Cable,
+  AlertTriangle,
   Building2,
+  Cable,
+  Calendar,
+  CheckCircle2,
+  Fuel,
+  LayoutDashboard,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
-import { useState } from "react";
-import type { StationAlert, StationOverview } from "@/types";
+import type { StationAnalytics } from "@/types";
+import {
+  DispensersChart,
+  TankCompositionChart,
+  TransactionsChart,
+  VolumeChart,
+  HourlyActivityChart,
+  SalesChart,
+  NozzlesChart,
+} from "@/components/dashboard/charts";
+import { DateRangeFilter } from "@/components/dashboard/date-range-filter";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { getFuelColor } from "@/lib/fuel-colors";
 
 export function StatCard({
   icon,
@@ -39,38 +54,47 @@ export function StatCard({
   );
 }
 
-export function ActivityChart({ activity }: { activity: { label: string; count: number }[] }) {
+export function ComparisonCard({ comparison }: { comparison: StationAnalytics["comparison"] }) {
+  if (!comparison) return null;
+  const items = [
+    { label: "Transactions", value: comparison.current.transactions.toLocaleString(), change: comparison.change.transactions },
+    { label: "Volume (L)", value: comparison.current.volume.toLocaleString(), change: comparison.change.volume },
+    { label: "Sales (₹)", value: comparison.current.amount.toLocaleString(), change: comparison.change.amount },
+    { label: "Avg Txn (₹)", value: comparison.current.averageTransaction.toLocaleString(undefined, { maximumFractionDigits: 2 }), change: comparison.change.averageTransaction },
+  ];
   return (
-    <div className="rounded-2xl border border-[#dce9e5] bg-white p-5 shadow-[0_12px_40px_-28px_rgba(23,53,47,0.35)] sm:p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-semibold text-[#17352f]">Station activity</h2>
-          <p className="mt-1 text-xs text-slate-500">Transactions in the last 12 hours</p>
+    <Card className="border-[#dce9e5]">
+      <CardHeader>
+        <CardTitle className="text-base text-[#17352f]">Period comparison</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {items.map((item) => {
+            const up = item.change.startsWith("+");
+            const down = item.change.startsWith("-");
+            return (
+              <div key={item.label} className="rounded-lg border border-[#edf3f0] p-3">
+                <p className="text-xs text-slate-500">{item.label}</p>
+                <p className="mt-1 text-lg font-semibold text-[#17352f]">{item.value}</p>
+                <div className="mt-1 flex items-center gap-1 text-xs">
+                  {up && <TrendingUp className="size-3.5 text-emerald-600" />}
+                  {down && <TrendingDown className="size-3.5 text-rose-600" />}
+                  {!up && !down && <span className="size-3.5" />}
+                  <span className={up ? "text-emerald-600" : down ? "text-rose-600" : "text-slate-500"}>
+                    {item.change}
+                  </span>
+                  <span className="text-slate-400">vs previous period</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <Link
-          className="inline-flex items-center gap-1 text-xs font-semibold text-[#16806c]"
-          href="/dispensers/reports"
-        >
-          View reports <ArrowUpRight className="size-3.5" />
-        </Link>
-      </div>
-      <div className="mt-8 flex h-48 items-end gap-2 sm:gap-4">
-        {activity.map((bucket) => (
-          <div key={bucket.label} className="flex flex-1 flex-col items-center gap-2">
-            <div
-              className="w-full rounded-t-md bg-[#b9e5d8]"
-              style={{ height: `${Math.max(4, (bucket.count / 1) * 100)}%` }}
-              title={`${bucket.count} transactions at ${bucket.label}`}
-            />
-            <span className="text-[10px] text-slate-400">{bucket.label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
-export function AlertsList({ alerts }: { alerts: StationAlert[] }) {
+export function AlertsList({ alerts }: { alerts: StationAnalytics["alerts"] }) {
   return (
     <div className="rounded-2xl border border-[#dce9e5] bg-[#17352f] p-6 text-white shadow-[0_12px_40px_-28px_rgba(23,53,47,0.5)]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8dd9c7]">
@@ -81,13 +105,13 @@ export function AlertsList({ alerts }: { alerts: StationAlert[] }) {
       </h2>
       {alerts.length > 0 ? (
         <ul className="mt-3 space-y-2 text-sm leading-6 text-[#b9d5ce]">
-          {alerts.slice(0, 3).map((alert) => (
+          {alerts.slice(0, 5).map((alert) => (
             <li key={`${alert.equipment}-${alert.id}`}>
               <span className="font-semibold text-white">{alert.equipment} {alert.id}</span>{": "}
               {alert.issue}
             </li>
           ))}
-          {alerts.length > 3 && <li>And {alerts.length - 3} more</li>}
+          {alerts.length > 5 && <li>And {alerts.length - 5} more</li>}
         </ul>
       ) : (
         <p className="mt-2 text-sm leading-6 text-[#b9d5ce]">
@@ -104,68 +128,82 @@ export function AlertsList({ alerts }: { alerts: StationAlert[] }) {
   );
 }
 
-type DateRangePreset = "week" | "month" | "year" | "custom";
-
-const DATE_RANGE_LABELS: Record<DateRangePreset, string> = {
-  week: "Past week",
-  month: "Past month",
-  year: "Past year",
-  custom: "Custom range",
-};
-
-function computeTransactionsInRange(
-  activity: { label: string; count: number }[],
-  range: DateRangePreset,
-): { label: string; count: number; total: number } {
-  const total = activity.reduce((sum, b) => sum + b.count, 0);
-  const label = DATE_RANGE_LABELS[range];
-  return { label, count: total, total };
-}
-
-export function DateRangeFilter({
-  range,
-  onChange,
+export function RecentTransactions({
+  transactions,
 }: {
-  range: DateRangePreset;
-  onChange: (range: DateRangePreset) => void;
+  transactions: Array<{
+    dispenserSerial: string;
+    nozzleNumber: string;
+    amount: number | null;
+    volume: number | null;
+    datetime: string;
+    product?: string;
+  }>;
 }) {
   return (
-    <div className="relative inline-block">
-      <button
-        onClick={() => onChange(range === "custom" ? "week" : "custom")}
-        className="inline-flex items-center gap-2 rounded-full border border-[#cde4dd] bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-[#f0f6f4] transition-colors"
-      >
-        <Calendar className="size-3.5" />
-        <span>{DATE_RANGE_LABELS[range]}</span>
-        <ChevronDown className="size-3.5" />
-      </button>
-      <div className="absolute z-50 mt-2 w-48 rounded-md border border-[#dce9e5] bg-white shadow-lg py-1">
-        {["week", "month", "year"].map((preset) => (
-          <button
-            key={preset}
-            onClick={() => onChange(preset as DateRangePreset)}
-            className="block w-full text-left px-3 py-2 text-xs hover:bg-[#f0f6f4] cursor-pointer"
-          >
-            {DATE_RANGE_LABELS[preset as DateRangePreset]}
-          </button>
-        ))}
-        <div className="h-px bg-[#e8f0ec]" />
-        <button
-          onClick={() => onChange("custom")}
-          className="block w-full text-left px-3 py-2 text-xs hover:bg-[#f0f6f4] cursor-pointer"
-        >
-          Custom range
-        </button>
-      </div>
-    </div>
+    <Card className="flex flex-col h-full">
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">Recent transactions</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="text-slate-500 border-b border-slate-100">
+                <th className="pb-2 pr-4 font-normal">Dispenser</th>
+                <th className="pb-2 pr-4 font-normal">Nozzle</th>
+                <th className="pb-2 pr-4 font-normal">Product</th>
+                <th className="pb-2 pr-4 font-normal text-right">Amount</th>
+                <th className="pb-2 pr-4 font-normal text-right">Volume (L)</th>
+                <th className="pb-2 font-normal">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.length === 0 ? (
+                <tr>
+                  <td className="p-4 text-center text-slate-400" colSpan={6}>
+                    No transactions in range
+                  </td>
+                </tr>
+              ) : (
+                transactions.map((tx) => {
+                  const fuel = getFuelColor(tx.product);
+                  return (
+                    <tr key={`${tx.dispenserSerial}-${tx.nozzleNumber}-${tx.datetime}`}>
+                      <td className="py-3 pr-4">{tx.dispenserSerial}</td>
+                      <td className="py-3 pr-4">{tx.nozzleNumber}</td>
+                      <td className="py-3 pr-4">
+                        {tx.product ? (
+                          <Badge className={`${fuel.bg} ${fuel.text} border ${fuel.ring} inline-flex items-center gap-1 text-[10px]`}>
+                            <span className={`size-1.5 rounded-full ${fuel.dot}`} aria-hidden="true" />
+                            {tx.product}
+                          </Badge>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 pr-4 text-right">
+                        {tx.amount === null ? "—" : tx.amount.toLocaleString()}
+                      </td>
+                      <td className="py-3 pr-4 text-right">
+                        {tx.volume === null ? "—" : tx.volume.toLocaleString()}
+                      </td>
+                      <td className="py-3">{tx.datetime}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
-export function DashboardPage({ overview }: { overview: StationOverview }) {
-  const [range, setRange] = useState<DateRangePreset>("month");
-  const station = overview.station;
-
-  const transactionMetrics = computeTransactionsInRange(overview.activity, range);
+export function DashboardPage({ analytics }: { analytics: StationAnalytics }) {
+  const station = analytics.station;
+  const { totals, daily, hourly, dispensers, tanks, health, activeDispensers, comparison, nozzleMetrics } = analytics;
 
   return (
     <div className="min-h-[calc(100vh-2.75rem)] bg-[#f6f8f7] p-5 sm:p-8">
@@ -185,125 +223,79 @@ export function DashboardPage({ overview }: { overview: StationOverview }) {
               {station.active ? "All systems operational" : "Attention required"}
             </span>
           </div>
+          <DateRangeFilter />
         </div>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
           <StatCard
-            icon={<Building2 />}
-            label="Station ID"
-            value={station.id}
-            detail={station.sapCustCode ? `SAP: ${station.sapCustCode}` : "SAP code not set"}
-          />
-          <StatCard
-            icon={<LayoutDashboard />}
-            label="Registered tanks"
-            value={overview.health.totalTanks.toLocaleString()}
-            detail={`${overview.health.tanksReporting} reporting telemetry`}
+            icon={<Calendar />}
+            label="Transactions"
+            value={totals.transactions.toLocaleString()}
+            detail={`in selected range`}
           />
           <StatCard
             icon={<Fuel />}
-            label="Registered dispensers"
-            value={overview.dispensers.registered.toLocaleString()}
-            detail="From dispenser inventory"
+            label="Volume dispensed"
+            value={totals.volume.toLocaleString()}
+            detail="Litres"
+          />
+          <StatCard
+            icon={<LayoutDashboard />}
+            label="Total sales"
+            value={`₹ ${totals.amount.toLocaleString()}`}
+            detail={`Avg ₹${totals.averageTransaction.toLocaleString(undefined, { maximumFractionDigits: 2 })} per transaction`}
           />
           <StatCard
             icon={<Cable />}
-            label="Observed nozzles"
-            value={overview.nozzles.observed.toLocaleString()}
-            detail="Unique dispenser and nozzle pairs"
+            label="Active dispensers"
+            value={`${activeDispensers} / ${dispensers.registered}`}
+            detail="With activity in range"
+          />
+          <StatCard
+            icon={<Building2 />}
+            label="Reporting tanks"
+            value={`${health.tanksReporting} / ${health.totalTanks}`}
+            detail="With live telemetry"
+          />
+          <StatCard
+            icon={health.percentage >= 90 ? (<CheckCircle2 className="size-9" />) : (<AlertTriangle className="size-9" />)}
+            label="Tank health"
+            value={`${health.percentage}%`}
+            detail={`Tank telemetry coverage`}
           />
         </section>
 
-        {/* <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-2xl border border-[#dce9e5] bg-white p-5 shadow-[0_12px_40px_-28px_rgba(23,53,47,0.35)]">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-[#17352f]">Sale transactions</h2>
-              <DateRangeFilter range={range} onChange={setRange} />
-            </div>
-            <div className="grid grid-cols-4 gap-3">
-              <div className="p-3 rounded-xl bg-[#f0f6f4]">
-                <p className="text-xs text-slate-500 uppercase font-medium">Transactions ({DATE_RANGE_LABELS[range]})</p>
-                <p className="mt-1 text-2xl font-semibold text-[#17352f]">{transactionMetrics.count.toLocaleString()}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-[#f0f6f4]">
-                <p className="text-xs text-slate-500 uppercase font-medium">Avg per hour</p>
-                <p className="mt-1 text-2xl font-semibold text-[#17352f]">
-                  {Math.round(transactionMetrics.count / 24).toLocaleString()}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-[#f0f6f4]">
-                <p className="text-xs text-slate-500 uppercase font-medium">Peak hour</p>
-                <p className="mt-1 text-2xl font-semibold text-[#17352f]">{transactionMetrics.count.toLocaleString()}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-[#f0f6f4]">
-                <p className="text-xs text-slate-500 uppercase font-medium">Status</p>
-                <p className="mt-1 text-xs font-semibold text-[#16806c]">Active</p>
-              </div>
-            </div>
-            <p className="mt-3 text-xs text-slate-400">
-              Comparing activity across the selected date range.
-            </p>
-          </div>
+        <ComparisonCard comparison={comparison} />
 
-          <div className="rounded-2xl border border-[#dce9e5] bg-white p-5 shadow-[0_12px_40px_-28px_rgba(23,53,47,0.35)]">
-            <ActivityChart activity={overview.activity} />
-          </div>
-
-          <div className="rounded-2xl border border-[#dce9e5] bg-[#17352f] p-6 text-white shadow-[0_12px_40px_-28px_rgba(23,53,47,0.5)] lg:col-span-2">
-            <AlertsList alerts={overview.alerts} />
-          </div>
-        </section> */}
-        {/*
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-2xl border border-[#dce9e5] bg-white p-5 shadow-[0_12px_40px_-28px_rgba(23,53,47,0.35)] lg:col-span-2">
-            <h2 className="font-semibold text-[#17352f] mb-4">Station details</h2>
-            <dl className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-4 border-b border-[#dce9e5] pb-2 last:border-none">
-                <dt className="text-slate-500">Station name</dt>
-                <dd className="font-medium text-[#17352f]">{station.name}</dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4 border-b border-[#dce9e5] pb-2 last:border-none">
-                <dt className="text-slate-500">Station ID</dt>
-                <dd className="font-mono text-[#17352f]">{station.id}</dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4 border-b border-[#dce9e5] pb-2 last:border-none">
-                <dt className="text-slate-500">SAP customer code</dt>
-                <dd className={station.sapCustCode ? "font-mono text-[#17352f]" : "font-mono text-slate-400"}>
-                  {station.sapCustCode || "Not configured"}
-                </dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4 border-b border-[#dce9e5] pb-2 last:border-none">
-                <dt className="text-slate-500">State office</dt>
-                <dd className="text-[#17352f]">{station.stateOffice}</dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4 border-b border-[#dce9e5] pb-2 last:border-none">
-                <dt className="text-slate-500">Divisional office</dt>
-                <dd className="text-[#17352f]">{station.divisionalOffice}</dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4 border-b border-[#dce9e5] pb-2 last:border-none">
-                <dt className="text-slate-500">Sales area</dt>
-                <dd className="text-[#17352f]">{station.salesArea}</dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4 border-b border-[#dce9e5] pb-2 last:border-none">
-                <dt className="text-slate-500">Dealer name</dt>
-                <dd className="text-[#17352f]">{station.dealerName}</dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4 border-b border-[#dce9e5] pb-2 last:border-none">
-                <dt className="text-slate-500">Location</dt>
-                <dd className="text-[#17352f]">{station.location}</dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4 border-b border-[#dce9e5] pb-2 last:border-none">
-                <dt className="text-slate-500">Pincode</dt>
-                <dd className="text-[#17352f]">{station.pincode}</dd>
-              </div>
-              <div className="grid grid-cols-2 gap-4 border-b border-[#dce9e5] pb-2 last:border-none">
-                <dt className="text-slate-500">Retail outlet ID</dt>
-                <dd className="font-mono text-[#17352f]">{station.retailOutletId}</dd>
-              </div>
-            </dl>
+          <TransactionsChart daily={daily} />
+          <VolumeChart daily={daily} />
+          <SalesChart daily={daily} />
+          {hourly && hourly.length > 0 ? (
+            <HourlyActivityChart hourly={hourly} />
+          ) : (
+            <TransactionsChart daily={daily} />
+          )}
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <DispensersChart dispensers={analytics.dispenserMetrics} />
+          {nozzleMetrics && nozzleMetrics.length > 0 ? (
+            <NozzlesChart nozzles={nozzleMetrics} />
+          ) : (
+            <DispensersChart dispensers={analytics.dispenserMetrics} />
+          )}
+          <TankCompositionChart tanks={tanks} />
+          <div className="flex flex-col h-full">
+            <AlertsList alerts={analytics.alerts} />
           </div>
         </section>
-        */}
+
+        <section className="grid gap-6">
+          <div className="lg:col-span-2">
+            <RecentTransactions transactions={analytics.recentTransactions} />
+          </div>
+        </section>
       </div>
     </div>
   );

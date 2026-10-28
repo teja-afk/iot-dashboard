@@ -103,7 +103,8 @@ export default async function TankDetailPage({
               <CardHeader className="border-b border-[#edf3f0] py-4">
                 <CardTitle className="text-base text-[#17352f]">Current tank contents</CardTitle>
                 <CardDescription>
-                  The graphic compares reported fuel and water volumes; tank capacity is not present in the source records.
+                  The graphic stacks the reported water, fuel, and ullage volumes inside the tank.
+                  Capacity is derived from those same readings, so the layers always fill the tank.
                 </CardDescription>
               </CardHeader>
               <CardContent className="py-5">
@@ -112,6 +113,7 @@ export default async function TankDetailPage({
                     id={tank.id}
                     fuelLevelLiters={latest?.fuelLevelLiters ?? null}
                     waterLevelLiters={latest?.waterLevelLiters ?? null}
+                    ullageLiters={latest?.ullageLiters ?? null}
                   />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-lg border border-[#edf3f0] p-3">

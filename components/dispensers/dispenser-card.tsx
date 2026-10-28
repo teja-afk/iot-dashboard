@@ -29,6 +29,22 @@ export function DispenserCard({ dispenser }: { dispenser: DispenserAsset }) {
           </p>
         </CardHeader>
         <CardContent>
+          {dispenser.nozzles.length > 0 && (
+            <div className="mb-4">
+              <p className="mb-1.5 text-[11px] uppercase tracking-wide text-slate-400">Observed nozzles</p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {dispenser.nozzles.map((nozzle) => (
+                  <span
+                    key={nozzle.id}
+                    className="inline-flex items-center gap-1 rounded-md border border-[#cde4dd] bg-[#e8f6f1] px-2 py-0.5 text-xs font-medium text-[#16806c]"
+                  >
+                    <span aria-hidden="true" className="text-[10px]">🔧</span>
+                    Nozzle {nozzle.nozzleNumber}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <dl className="grid grid-cols-2 gap-x-3 gap-y-4">
             <div className="min-w-0">
               <dt className="text-[11px] uppercase tracking-wide text-slate-400">Observed nozzles</dt>

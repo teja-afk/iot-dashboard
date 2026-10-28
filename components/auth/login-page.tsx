@@ -1,4 +1,17 @@
-export function LoginPage() {
+"use client";
+
+import { useState } from "react";
+import { useActionState } from "react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { loginAction } from "@/lib/auth-actions";
+
+export function LoginPage({ redirect }: { redirect?: string }) {
+  const [state, formAction, pending] = useActionState(loginAction, { error: undefined });
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <main className="grid min-h-svh lg:grid-cols-2">
       <section className="relative hidden overflow-hidden bg-[#103c36] text-white lg:flex lg:flex-col lg:justify-between lg:p-12 xl:p-16">
@@ -89,11 +102,72 @@ export function LoginPage() {
               <p className="text-xs text-slate-500">Connected operations platform</p>
             </div>
           </div>
-          <div className="border rounded-lg p-4 text-center text-sm text-slate-500">
-            Login form placeholder — authentication service not yet connected.
-          </div>
+          <form action={formAction} className="space-y-5">
+            {redirect ? (
+              <input type="hidden" name="redirect" value={redirect} />
+            ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-xs font-medium text-slate-600">
+                Username
+              </Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                required
+                autoFocus
+                autoComplete="username"
+                placeholder="Enter your username"
+                className="h-10 border-[#dce9e5] bg-white focus-visible:ring-2 focus-visible:ring-[#16806c]/25"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-xs font-medium text-slate-600">
+                Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  className="h-10 border-[#dce9e5] bg-white pr-10 focus-visible:ring-2 focus-visible:ring-[#16806c]/25"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            </div>
+
+            {state.error ? (
+              <p className="text-xs font-medium text-rose-600" role="alert">
+                {state.error}
+              </p>
+            ) : null}
+
+            <Button
+              type="submit"
+              disabled={pending}
+              className="h-10 w-full bg-[#16806c] text-white hover:bg-[#0f5e55] disabled:opacity-50"
+            >
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                "Sign in"
+              )}
+            </Button>
+          </form>
+
           <p className="mt-10 text-center text-xs text-slate-400">
-            Authentication will be enabled when the server-side auth service is connected.
+            Contact your administrator for account access.
           </p>
         </div>
       </section>

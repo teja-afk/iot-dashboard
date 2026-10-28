@@ -21,9 +21,6 @@ export function TankCard({ tank }: { tank: TankAsset }) {
           <Badge className={tank.probeStatus.toLowerCase() === "active" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}>
             {tank.probeStatus}
           </Badge>
-          <p className="col-span-2 text-sm text-slate-500">
-            Retail outlet {tank.retailOutletId} · {tank.height ?? "—"} × {tank.width ?? "—"} mm
-          </p>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-2 gap-x-3 gap-y-4">
@@ -54,7 +51,7 @@ export function TankCard({ tank }: { tank: TankAsset }) {
           </dl>
         </CardContent>
         <CardFooter className="justify-between border-[#edf3f0] pt-3 text-xs text-slate-500">
-          <span>View telemetry and maintenance</span>
+          <span>Last transaction: {tank.latestReading?.datetime ?? "No telemetry"}</span>
           <span className="inline-flex items-center gap-1 font-semibold text-[#16806c]">
             Details <ArrowUpRight aria-hidden="true" className="size-3.5" />
           </span>

@@ -39,7 +39,7 @@ export function AssetList({
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return items;
     return items.filter((item) =>
-      `${item.id} ${item.name} ${item.subtitle} ${item.status} ${item.metrics.map((metric) => metric.value).join(" ")}`
+        `${item.id} ${item.name} ${item.subtitle ?? ""} ${item.status} ${item.metrics.map((metric) => metric.value).join(" ")}`
         .toLowerCase()
         .includes(normalizedQuery),
     );
@@ -99,7 +99,9 @@ export function AssetList({
                         </div>
                       </div>
                       <Badge className={statusStyles[item.statusTone]}>{item.status}</Badge>
-                      <p className="col-span-2 text-sm text-slate-500">{item.subtitle}</p>
+                      {item.subtitle ? (
+                        <p className="col-span-2 text-sm text-slate-500">{item.subtitle}</p>
+                      ) : null}
                     </CardHeader>
                     <CardContent>
                       {item.visual ? (

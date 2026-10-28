@@ -1,13 +1,29 @@
 "use client";
 
 import { DataTable, type ColumnDef } from "@/components/ui/data-table-bulk-actions";
+import { Badge } from "@/components/ui/badge";
 import type { DispenserTransaction } from "@/types";
+import { getFuelColor } from "@/lib/fuel-colors";
 
 export function DispenserReports({ transactions }: { transactions: DispenserTransaction[] }) {
   const columns: ColumnDef<DispenserTransaction, unknown>[] = [
     { accessorKey: "datetime", header: "Date / time", cell: ({ getValue }) => <span className="whitespace-nowrap text-xs text-slate-500">{getValue<string>()}</span> },
     { accessorKey: "dispenserSerial", header: "Dispenser", cell: ({ getValue }) => <span className="font-medium text-[#17352f]">{getValue<string>()}</span> },
     { accessorKey: "nozzleNumber", header: "Nozzle", cell: ({ getValue }) => <span>{getValue<string>()}</span> },
+    {
+      accessorKey: "product",
+      header: "Product",
+      cell: ({ getValue }) => {
+        const product = getValue<string>();
+        const fuel = getFuelColor(product);
+        return (
+          <Badge className={`${fuel.bg} ${fuel.text} border ${fuel.ring} inline-flex items-center gap-1.5`}>
+            <span className={`size-2 rounded-full ${fuel.dot}`} aria-hidden="true" />
+            {product}
+          </Badge>
+        );
+      },
+    },
     { accessorKey: "volume", header: "Volume", meta: { align: "right" }, cell: ({ getValue }) => <span>{getValue<number | null>()?.toLocaleString() ?? "—"} L</span> },
     { accessorKey: "amount", header: "Amount", meta: { align: "right" }, cell: ({ getValue }) => <span>{getValue<number | null>()?.toLocaleString() ?? "—"}</span> },
     { accessorKey: "unitPrice", header: "Unit price", meta: { align: "right" }, cell: ({ getValue }) => <span>{getValue<number | null>()?.toLocaleString() ?? "—"}</span> },

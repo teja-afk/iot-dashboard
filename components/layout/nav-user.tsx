@@ -21,6 +21,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { ChevronsUpDownIcon, BadgeCheckIcon, BellIcon, LogOutIcon } from "lucide-react";
+import { logoutAction } from "@/lib/auth-actions";
 
 export function NavUser({
   user,
@@ -88,8 +89,12 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
-              <LogOutIcon />
-              Log out
+              <form action={logoutAction} className="flex w-full">
+                <button type="submit" className="flex w-full items-center">
+                  <LogOutIcon />
+                  Log out
+                </button>
+              </form>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

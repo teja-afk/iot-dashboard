@@ -1,7 +1,9 @@
 "use client";
 
 import { DataTable, type ColumnDef } from "@/components/ui/data-table-bulk-actions";
+import { Badge } from "@/components/ui/badge";
 import type { NozzleSummary } from "@/types";
+import { getFuelColor } from "@/lib/fuel-colors";
 
 export function NozzleReports({ nozzles }: { nozzles: NozzleSummary[] }) {
   const columns: ColumnDef<NozzleSummary, unknown>[] = [
@@ -10,6 +12,20 @@ export function NozzleReports({ nozzles }: { nozzles: NozzleSummary[] }) {
     { accessorKey: "transactionCount", header: "Telemetry records", meta: { align: "right" } },
     { accessorKey: "totalVolume", header: "Recorded volume (L)", meta: { align: "right" }, cell: ({ getValue }) => <span>{getValue<number>().toLocaleString()}</span> },
     { accessorKey: "totalAmount", header: "Recorded amount", meta: { align: "right" }, cell: ({ getValue }) => <span>{getValue<number>().toLocaleString()}</span> },
+    {
+      accessorKey: "product",
+      header: "Product",
+      cell: ({ getValue }) => {
+        const product = getValue<string>();
+        const fuel = getFuelColor(product);
+        return (
+          <Badge className={`${fuel.bg} ${fuel.text} border ${fuel.ring} inline-flex items-center gap-1.5`}>
+            <span className={`size-2 rounded-full ${fuel.dot}`} aria-hidden="true" />
+            {product}
+          </Badge>
+        );
+      },
+    },
     { accessorFn: (nozzle) => nozzle.latestTransaction?.datetime ?? "", id: "lastActivity", header: "Last activity", cell: ({ getValue }) => <span className="whitespace-nowrap text-xs text-slate-500">{getValue<string>() || "—"}</span> },
   ];
 
