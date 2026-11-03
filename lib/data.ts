@@ -21,6 +21,7 @@ import type {
   NozzleErrorLog,
   NozzleCpuSpec,
   AuthUser,
+  ErrorCode,
   OutletId,
   StationAlert,
   StationAnalytics,
@@ -503,11 +504,11 @@ async function loadErrorLogs(
     const serialValues = [serialNumber, Number(serialNumber)].filter(
       (value) => typeof value === "string" || Number.isFinite(value),
     );
-    const orConditions: Filter<ReadErrorLogDocument>[] = [
-      { serial_no: { $in: serialValues } },
-    ];
-    if (nza !== undefined) orConditions.push({ nza });
-    conditions.push({ $or: orConditions });
+    if (nza !== undefined) {
+      conditions.push({ serial_no: { $in: serialValues }, nza });
+    } else {
+      conditions.push({ serial_no: { $in: serialValues } });
+    }
   } else {
     if (outletValues.length > 0) {
       conditions.push({ retail_outlet: { $in: outletValues } });
@@ -564,11 +565,11 @@ async function loadCpuSpecs(
     const serialValues = [serialNumber, Number(serialNumber)].filter(
       (value) => typeof value === "string" || Number.isFinite(value),
     );
-    const orConditions: Filter<ReadCpuSpecDocument>[] = [
-      { serial_no: { $in: serialValues } },
-    ];
-    if (nza !== undefined) orConditions.push({ nza });
-    conditions.push({ $or: orConditions });
+    if (nza !== undefined) {
+      conditions.push({ serial_no: { $in: serialValues }, nza });
+    } else {
+      conditions.push({ serial_no: { $in: serialValues } });
+    }
   } else {
     if (outletValues.length > 0) {
       conditions.push({ retail_outlet: { $in: outletValues } });
@@ -1459,4 +1460,54 @@ export async function createAuthUser(input: {
   const database = await getMongoDatabase();
   await database.collection<AuthUserDocument>("auth_users").insertOne(document);
   return mapAuthUser(document);
+}
+
+interface ErrorCodeDocument extends Document {
+  _id?: unknown;
+  datetime?: string;
+  revision?: string;
+  note?: string;
+  revision_desc1?: string;
+  revision_desc2?: string;
+  title?: string;
+  check_code?: string;
+  description?: string;
+  power_reset_required_to_clear_check_code?: string;
+  error_recover_on_nozzle_lift?: string;
+  error_type?: string;
+  recovery?: string;
+}
+
+function mapErrorCode(document: ErrorCodeDocument): ErrorCode {
+  return {
+    id: String(document._id ?? ""),
+    datetime: text(document.datetime),
+    revision: text(document.revision),
+    note: text(document.note),
+    revisionDesc1: text(document.revision_desc1),
+    revisionDesc2: text(document.revision_desc2),
+    title: text(document.title),
+    checkCode: text(document.check_code),
+    description: text(document.description),
+    powerResetRequiredToClearCheckCode: text(document.power_reset_required_to_clear_check_code),
+    errorRecoverOnNozzleLift: text(document.error_recover_on_nozzle_lift),
+    errorType: text(document.error_type),
+    recovery: text(document.recovery),
+  };
+}
+
+export async function listErrorCodes(): Promise<ErrorCode[]> {
+  const database = await getMongoDatabase();
+  const collections = ["error_code_list", "errorcodes"];
+  for (const collection of collections) {
+    const documents = await database
+      .collection<ErrorCodeDocument>(collection)
+      .find({})
+      .sort({ datetime: -1 })
+      .toArray();
+    if (documents.length > 0) {
+      return documents.map(mapErrorCode);
+    }
+  }
+  return [];
 }

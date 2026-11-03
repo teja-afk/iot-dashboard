@@ -322,6 +322,7 @@ export type OverviewItem = {
   progress?: number;
   progressLabel?: string;
   visual?: React.ReactNode;
+  footer?: React.ReactNode;
 };
 
 export type AuthService = {
@@ -343,4 +344,20 @@ export type AuthUser = {
   username: string;
   role: "operator" | "manager" | "admin";
   active: boolean;
+};
+
+export type ErrorCode = {
+  id: string;
+  datetime: string;
+  revision: string;
+  note: string;
+  revisionDesc1: string;
+  revisionDesc2: string;
+  title: string;
+  checkCode: string;
+  description: string;
+  powerResetRequiredToClearCheckCode: string;
+  errorRecoverOnNozzleLift: string;
+  errorType: string;
+  recovery: string;
 };

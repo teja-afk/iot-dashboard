@@ -13,7 +13,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { GalleryVerticalEndIcon, LayoutDashboardIcon, DatabaseIcon, FuelIcon, CableIcon } from "lucide-react";
+import { GalleryVerticalEndIcon, LayoutDashboardIcon, DatabaseIcon, FuelIcon, CableIcon, ListChecksIcon } from "lucide-react";
 
 const data = {
   navMain: [
@@ -37,6 +37,11 @@ const data = {
       title: "Nozzles",
       url: "/nozzles",
       icon: <CableIcon />,
+    },
+    {
+      title: "Error code list",
+      url: "/error-codes",
+      icon: <ListChecksIcon />,
     },
   ],
 };

@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, AlertTriangle, Cpu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getDispenserBySerial, listNozzlesByDispenserId, listDispenserTransactions } from "@/lib/data";
+import { getDispenserBySerial, listNozzlesByDispenserId, listDispenserTransactions, listErrorLogs, listCpuSpecs } from "@/lib/data";
 import { getSelectedOutletId } from "@/lib/station-cookie";
 import { getFuelColor } from "@/lib/fuel-colors";
 
@@ -17,10 +17,12 @@ export default async function DispenserDetailPage({
 }) {
   const { dispenserId } = await params;
   const outletId = await getSelectedOutletId();
-  const [dispenser, nozzles, activity] = await Promise.all([
+  const [dispenser, nozzles, activity, errorLogs, cpuSpecs] = await Promise.all([
     getDispenserBySerial(dispenserId, outletId),
     listNozzlesByDispenserId(dispenserId, outletId),
     listDispenserTransactions(dispenserId, outletId),
+    listErrorLogs(dispenserId, undefined, outletId),
+    listCpuSpecs(dispenserId, undefined, outletId),
   ]);
   if (!dispenser) return null;
 
@@ -261,6 +263,78 @@ export default async function DispenserDetailPage({
                     <dd className="mt-1 text-sm font-medium text-[#17352f]">{dispenser.latestTransaction?.datetime ?? "—"}</dd>
                   </div>
                 </dl>
+              </CardContent>
+            </Card>
+            <Card className="gap-0 border-[#dce9e5] py-0">
+              <CardHeader className="border-b border-[#edf3f0] py-4">
+                <CardTitle className="flex items-center gap-2 text-base text-[#17352f]">
+                  <Cpu aria-hidden="true" className="size-4" /> CPU specification
+                </CardTitle>
+                <CardDescription>ReadCPUSpecificationWithNewSrNo records for this dispenser.</CardDescription>
+              </CardHeader>
+              <CardContent className="py-5">
+                {cpuSpecs.length === 0 ? (
+                  <p className="text-sm text-slate-500">No CPU specifications recorded for this dispenser.</p>
+                ) : (
+                  <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                    {cpuSpecs.slice(0, 3).map((spec) => (
+                      <div key={spec.id} className="min-w-0 sm:col-span-2">
+                        <p className="text-xs font-medium text-slate-500">{spec.datetime}</p>
+                        <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wide text-slate-400">Hardware S/N</dt>
+                            <dd className="mt-0.5 font-medium text-[#17352f]">{spec.hardwareSrNo}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wide text-slate-400">Software</dt>
+                            <dd className="mt-0.5 font-medium text-[#17352f]">{spec.softwareVersion}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wide text-slate-400">WLMC CRC</dt>
+                            <dd className="mt-0.5 font-medium text-[#17352f]">{spec.wlmcCrc}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-[10px] uppercase tracking-wide text-slate-400">Code CRC</dt>
+                            <dd className="mt-0.5 font-medium text-[#17352f]">{spec.codeCrc}</dd>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="gap-0 border-[#dce9e5] py-0">
+              <CardHeader className="border-b border-[#edf3f0] py-4">
+                <CardTitle className="flex items-center gap-2 text-base text-[#17352f]">
+                  <AlertTriangle aria-hidden="true" className="size-4" /> Error logs
+                </CardTitle>
+                <CardDescription>ReadErrorLog records for this dispenser.</CardDescription>
+              </CardHeader>
+              <CardContent className="py-5">
+                {errorLogs.length === 0 ? (
+                  <p className="text-sm text-slate-500">No error logs recorded for this dispenser.</p>
+                ) : (
+                  <ul className="space-y-4">
+                    {errorLogs.slice(0, 5).map((log) => (
+                      <li key={log.id} className="flex gap-3">
+                        <span className="mt-0.5 size-4 shrink-0 rounded-full bg-rose-500" aria-hidden="true" />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                            <p className="text-sm font-medium text-[#17352f]">
+                              Error {log.errorCode} · {log.description}
+                            </p>
+                            <time className="text-xs text-slate-400">{log.datetime}</time>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Topic {log.topic} · DUA {log.dua}
+                            {log.powerResetRequired === "YES" ? " · power reset required" : ""}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </CardContent>
             </Card>
             <Card className="gap-0 border-[#dce9e5] py-0">
